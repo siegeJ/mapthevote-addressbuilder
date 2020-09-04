@@ -1,0 +1,40 @@
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# NUNIT
+*.VisualState.xml
+TestResult.xml
+
+# DotCover is a Code Coverage Tool
+*.dotCover
+
+# NuGet Packages
+*.nupkg
+# The packages folder can be ignored because of Package Restore
+**/src/packages/*
+**/src/Infrastructure/packages/*
+# except build/, which is used as an MSBuild target.
+!**/packages/build/
+
+#BenchmarkDotNet results
+BenchmarkDotNet.Artifacts/
