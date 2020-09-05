@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
+﻿
 namespace MapTheVoteAddressBuilder
 {
     public class TargetRequest
@@ -25,5 +22,8 @@ namespace MapTheVoteAddressBuilder
         public int Status { get; set; }
         public int Count { get; set; }
         public string LatLng { get; set; }
+
+        public bool NeedsApplication { get { return Status == 1; } } // 1 is the only purely uncontacted state.
+        public bool IsSingleHousehold { get { return Count == 1; } }
     }
 }

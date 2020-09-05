@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
+﻿
 namespace MapTheVoteAddressBuilder
 {
     public class AddressResponse
@@ -24,6 +21,9 @@ namespace MapTheVoteAddressBuilder
         //    "created": 1591244383712,
         //    "modified": 1599067019417
         //},
+
+        public float Lng { get; set; }
+        public float Lat { get; set; }
 
         public int Id { get; set; }
 
