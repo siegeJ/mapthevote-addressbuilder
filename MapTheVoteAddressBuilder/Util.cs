@@ -16,6 +16,7 @@ namespace MapTheVoteAddressBuilder
         ApplicationSubmit,
         ApplicationConfirm,
         ButtonClick,
+        MarkApplicationProcessed,
         Misc
     }
 

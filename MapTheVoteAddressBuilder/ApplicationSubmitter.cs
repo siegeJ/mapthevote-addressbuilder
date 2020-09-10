@@ -25,18 +25,10 @@ namespace MapTheVoteAddressBuilder
                     var submissionSuccess = await SubmitNewApplication(aDriver, address);
                     if (submissionSuccess)
                     {
-                        var mapSuccess = await aDriver.ClickOnButton("map-infowindow");
-                        if (mapSuccess)
+                        var applicationLogged = await MarkApplicationProcessed(aDriver);
+                        if (applicationLogged)
                         {
-                            mapSuccess = await aDriver.ClickOnButton("wizard-button-all-done");
-
-                            var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                            btnWait.Until(ExpectedConditions.ElementToBeClickable(By.ClassName("map-infowindow")));
-
-                            if (mapSuccess)
-                            {
-                                SubmittedAddresses.Add(address);
-                            }                            
+                            SubmittedAddresses.Add(address);
                         }
                     }
                 }
@@ -47,6 +39,34 @@ namespace MapTheVoteAddressBuilder
             await Util.RandomWait(300, 150);
             
             return SubmittedAddresses;
+        }
+
+        private async Task<bool> MarkApplicationProcessed(RemoteWebDriver aDriver)
+        {
+            var applicationProcessed = false;
+
+            try
+            {
+                // Click on the "tap to start questionnaire" button
+                applicationProcessed = await aDriver.ClickOnButton("map-infowindow");
+                if (applicationProcessed)
+                {
+                    // Click on the "Everyone Registered!" button
+                    applicationProcessed = await aDriver.ClickOnButton("wizard-button-all-done");
+
+                    // It takes a while for this operation to complete. Wait until the window has closed,
+                    // and the new "Registered" window re-opens before returning back to the caller.
+                    var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                    btnWait.Until(ExpectedConditions.ElementToBeClickable(By.ClassName("map-infowindow")));
+                }
+            }
+            catch(Exception e)
+            {
+                Util.LogError(ErrorPhase.MarkApplicationProcessed, e.ToString());
+                applicationProcessed = false;
+            }
+
+            return applicationProcessed;
         }
 
         public static async Task<bool> SubmitNewApplication(RemoteWebDriver aDriver, AddressResponse aAddress, bool openNewTab = true)
