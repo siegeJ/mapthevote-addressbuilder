@@ -34,6 +34,7 @@ namespace MapTheVoteAddressBuilder
                 }
             }
 
+            // Close the window so that we can continue sweeping for input.
             var closeInfoWindowScript = "if (typeof infoWindow != 'undefined') infoWindow.close();";
             aDriver.ExecuteScript(closeInfoWindowScript);
             await Util.RandomWait(300, 150);
@@ -48,11 +49,11 @@ namespace MapTheVoteAddressBuilder
             try
             {
                 // Click on the "tap to start questionnaire" button
-                applicationProcessed = await aDriver.ClickOnButton("map-infowindow");
+                applicationProcessed = await aDriver.ClickOnElement("map-infowindow");
                 if (applicationProcessed)
                 {
                     // Click on the "Everyone Registered!" button
-                    applicationProcessed = await aDriver.ClickOnButton("wizard-button-all-done");
+                    applicationProcessed = await aDriver.ClickOnElement("wizard-button-all-done");
 
                     // It takes a while for this operation to complete. Wait until the window has closed,
                     // and the new "Registered" window re-opens before returning back to the caller.

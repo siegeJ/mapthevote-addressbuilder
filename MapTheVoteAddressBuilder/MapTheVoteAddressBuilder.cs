@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq.Expressions;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
@@ -41,22 +43,14 @@ namespace MapTheVoteAddressBuilder
 
             SetupDriver();
 
-            // Can't set a cookie for a domain that we're not yet on.
-            // Go to something that we know will 404 so that we can set cookies
-            // before continuing execution.
-            _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
-
             string JSESSIONID = "";
-            // TODO: Detect if JSESSION was valid. If not, we'll need to log in.
-            if (string.IsNullOrEmpty(JSESSIONID))
+            if (!string.IsNullOrEmpty(JSESSIONID))
             {
-                Console.WriteLine("You need to put in your JSESSIONID and coordinates noob.");
-                Console.ReadLine();
-                System.Environment.FailFast("");
-                //LoginToMapTheVote();
-            }
-            else
-            {
+                // Can't set a cookie for a domain that we're not yet on.
+                // Go to something that we know will 404 so that we can set cookies
+                // before continuing execution.
+                _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
+
                 // TODO: Attempt to get cookie from browser.
                 _driver.Manage().Cookies.AddCookie(new OpenQA.Selenium.Cookie("JSESSIONID", JSESSIONID, "mapthe.vote", "/", null));
             }
@@ -64,11 +58,24 @@ namespace MapTheVoteAddressBuilder
             // With our JSESSION initialized, we can move onto the actual map.
             _driver.Navigate().GoToUrl(@"https://mapthe.vote/map");
 
-            var enterMapBtn = _driver.FindElementByClassName("map-msg-button");
-            enterMapBtn.Click();
+            // Need to manually log in if we don't have a valid cookie.
+            if (string.IsNullOrEmpty(JSESSIONID))
+            {
+                LoginToMapTheVote();
+
+                var jsessionCookie = _driver.Manage().Cookies.GetCookieNamed("JSESSIONID");
+                if (jsessionCookie != null)
+                {
+                    JSESSIONID = jsessionCookie.Value;
+                }
+            }
+
+            // I hate this, but for some reason waiting for map-msg-button just doesn't work.
+            Util.RandomWait(1000).Wait();
+
+            _driver.ClickOnElement("map-msg-button", ElementSearchType.ClassName).Wait();
 
             var numFails = 0;
-
             while (numFails < 5)
             {
                 var appSubmitter = new ApplicationSubmitter();
@@ -83,7 +90,6 @@ namespace MapTheVoteAddressBuilder
                     scraper.Initialize(JSESSIONID);
 
                     taskList.Add(scraper.GetTargetAddresses(_driver));
-
                     
                     taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
 
@@ -97,6 +103,7 @@ namespace MapTheVoteAddressBuilder
                 var numAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
                 Console.WriteLine($"Successfully submitted { numAddressesSubmitted } applications.");
 
+                // We wait for 5 consecutive fails before ultimately deciding to call it quits.
                 var adressesSubmitted = numAddressesSubmitted != 0;
                 numFails = adressesSubmitted ? 0 : numFails + 1;
 
@@ -141,25 +148,33 @@ namespace MapTheVoteAddressBuilder
         static void LoginToMapTheVote()
         {
             // Find the "Login with email" button.
-            var loginEmailBtn = _driver.WaitForElement("firebaseui-idp-password");
-            if (loginEmailBtn == null)
+
+            try
             {
+                _driver.ClickOnElement("firebaseui-idp-password", ElementSearchType.ClassName).Wait();
+            }
+            catch (Exception e)
+            {
+                // if it doesn't exist yet, it's likely/possible that the user
+                // has already logged in.
+                if (!(e is NoSuchElementException))
+                {
+                    Util.LogError(ErrorPhase.MapTheVoteLogin, e.ToString());
+                }
+
                 return;
             }
-            loginEmailBtn.Click(); // Click button
 
             // Find the "Enter email address" field
             var nameField = _driver.FindElementByName("email");
             nameField.SendKeys("hegayiv804@wonrg.com");
 
-            var submitEmailBtn = _driver.FindElementByClassName("firebaseui-id-submit");
-            submitEmailBtn.Click();
+            _driver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
 
-            var passwordField = _driver.FindElementByName("password");
+            var passwordField = _driver.WaitForElement("password");
             passwordField.SendKeys("3*YevRM1i7L9");
 
-            submitEmailBtn = _driver.FindElementByClassName("firebaseui-id-submit");
-            submitEmailBtn.Click();
+            _driver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
         }
 
         static void WaitForAddressSelection()

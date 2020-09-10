@@ -12,12 +12,19 @@ namespace MapTheVoteAddressBuilder
 {
     public enum ErrorPhase
     {
+        MapTheVoteLogin,
         AddressSelection,
         ApplicationSubmit,
         ApplicationConfirm,
         ButtonClick,
         MarkApplicationProcessed,
         Misc
+    }
+
+    public enum ElementSearchType
+    {
+        ID,
+        ClassName
     }
 
     public static class Util
@@ -31,17 +38,44 @@ namespace MapTheVoteAddressBuilder
             Console.ForegroundColor = ConsoleColor.White;
         }
 
-        public static async Task<bool> ClickOnButton(this RemoteWebDriver aDriver, string id)
+        public static async Task<bool> ClickOnElement(this RemoteWebDriver aDriver, string id, ElementSearchType searchType = ElementSearchType.ID)
         {
             bool success = false;
             try
             {
-                var registerBtn = aDriver.FindElementById(id);
+                Func<IWebDriver, IWebElement> checkElementExists = null;
+                
+                switch(searchType)
+                {
+                    case ElementSearchType.ID:
+                    {
+                        checkElementExists = ExpectedConditions.ElementExists(By.Id(id));
+                        break;
+                    }
 
+                    case ElementSearchType.ClassName:
+                    {
+                        checkElementExists = ExpectedConditions.ElementExists(By.ClassName(id));
+                        break;
+                    }
+
+                    default:
+                    {
+                        break;
+                    }
+                }
+
+                // Ensure first that the element exists on screen.
                 var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
-                registerBtn.Click();
+                var elementToClick = btnWait.Until(checkElementExists);
 
+                // Now ensure that it's clickable.
+                var clickWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                clickWait.Until(ExpectedConditions.ElementToBeClickable(elementToClick));
+                elementToClick.Click();
+
+                // This is a final "catch all" wait in case someone after us doesn't properly wait (like a script).
+                // TBH it's probably unnecessary, but can be removed in the future.
                 await Util.RandomWait(250, 400);
 
                 success = true;
