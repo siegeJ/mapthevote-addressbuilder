@@ -14,7 +14,9 @@ namespace MapTheVoteAddressBuilder
     {
         AddressSelection,
         ApplicationSubmit,
-        ApplicationConfirm
+        ApplicationConfirm,
+        ButtonClick,
+        Misc
     }
 
     public static class Util
@@ -26,6 +28,29 @@ namespace MapTheVoteAddressBuilder
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"ERROR: [{aWarningType}] - {aErrorMessage}");
             Console.ForegroundColor = ConsoleColor.White;
+        }
+
+        public static async Task<bool> ClickOnButton(this RemoteWebDriver aDriver, string id)
+        {
+            bool success = false;
+            try
+            {
+                var registerBtn = aDriver.FindElementById(id);
+
+                var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
+                registerBtn.Click();
+
+                await Util.RandomWait(250, 400);
+
+                success = true;
+            }
+            catch (Exception e)
+            {
+                Util.LogError(ErrorPhase.ButtonClick, e.ToString());
+            }
+
+            return success;
         }
 
         public static IWebElement WaitForElement(this RemoteWebDriver aDriver, string elementName, double aTimeout = 3.0)
