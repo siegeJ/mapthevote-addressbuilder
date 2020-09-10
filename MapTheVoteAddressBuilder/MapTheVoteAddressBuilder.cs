@@ -39,25 +39,6 @@ namespace MapTheVoteAddressBuilder
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
             Console.ForegroundColor = ConsoleColor.White;
 
-            string JSESSIONID = "";
-            var tr = new TargetRequest()
-            {
-                //To get JESSIONID, log into mapthe.vote/map
-                //Go to cookies in developer menu, get value of JSESSIONID
-
-                N = "32.960363",
-                S = "32.954188",
-                E = "-96.66536",
-                W = "-96.673546"
-            };
-
-            if (string.IsNullOrWhiteSpace(tr.JSESSIONID))
-            {
-                Console.WriteLine("You need to put in your JSESSIONID and coordinates noob.");
-                Console.ReadLine();
-                System.Environment.FailFast("");
-            }
-
             SetupDriver();
 
             // Can't set a cookie for a domain that we're not yet on.
@@ -65,14 +46,23 @@ namespace MapTheVoteAddressBuilder
             // before continuing execution.
             _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
 
-            // TODO: Attempt to get cookie from browser.
-            _driver.Manage().Cookies.AddCookie(new OpenQA.Selenium.Cookie("JSESSIONID", tr.JSESSIONID, "mapthe.vote", "/", null));
+            string JSESSIONID = "EiF3eMOLCgfB2cFGeZQubg";
+            // TODO: Detect if JSESSION was valid. If not, we'll need to log in.
+            if (string.IsNullOrEmpty(JSESSIONID))
+            {
+                Console.WriteLine("You need to put in your JSESSIONID and coordinates noob.");
+                Console.ReadLine();
+                System.Environment.FailFast("");
+                //LoginToMapTheVote();
+            }
+            else
+            {
+                // TODO: Attempt to get cookie from browser.
+                _driver.Manage().Cookies.AddCookie(new OpenQA.Selenium.Cookie("JSESSIONID", JSESSIONID, "mapthe.vote", "/", null));
+            }
 
             // With our JSESSION initialized, we can move onto the actual map.
             _driver.Navigate().GoToUrl(@"https://mapthe.vote/map");
-
-            // TODO: Detect if JSESSION was valid. If not, we'll need to log in.
-            //if (jsessionInvalid) { LoginToMapTheVote(); }
 
             var enterMapBtn = _driver.FindElementByClassName("map-msg-button");
             enterMapBtn.Click();
@@ -81,25 +71,34 @@ namespace MapTheVoteAddressBuilder
 
             while (numFails < 5)
             {
-                WaitForAddressSelection();
-
-                var taskList = new List<Task>();
-
-                var scraper = new AddressScraper();
-                scraper.Initialize(tr.JSESSIONID);
-
-                taskList.Add(scraper.GetTargetAddresses(_driver));
-
                 var appSubmitter = new ApplicationSubmitter();
-                taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
 
-                Task.WaitAll(taskList.ToArray());
+                try
+                {
+                    WaitForAddressSelection();
+
+                    var taskList = new List<Task>();
+
+                    var scraper = new AddressScraper();
+                    scraper.Initialize(JSESSIONID);
+
+                    taskList.Add(scraper.GetTargetAddresses(_driver));
+
+                    
+                    taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
+
+                    Task.WaitAll(taskList.ToArray());
+                }
+                catch (Exception e)
+                {
+                    Util.LogError(ErrorPhase.Misc, e.ToString());
+                }
 
                 var numAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
                 Console.WriteLine($"Successfully submitted { numAddressesSubmitted } applications.");
 
                 var adressesSubmitted = numAddressesSubmitted != 0;
-                numFails = adressesSubmitted ? numFails + 1 : 0 ;
+                numFails = adressesSubmitted ? 0 : numFails + 1;
 
                 if (adressesSubmitted)
                 {

@@ -15,7 +15,8 @@ namespace MapTheVoteAddressBuilder
         AddressSelection,
         ApplicationSubmit,
         ApplicationConfirm,
-        ButtonClick
+        ButtonClick,
+        Misc
     }
 
     public static class Util
