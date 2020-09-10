@@ -46,7 +46,7 @@ namespace MapTheVoteAddressBuilder
             // before continuing execution.
             _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
 
-            string JSESSIONID = "EiF3eMOLCgfB2cFGeZQubg";
+            string JSESSIONID = "";
             // TODO: Detect if JSESSION was valid. If not, we'll need to log in.
             if (string.IsNullOrEmpty(JSESSIONID))
             {
