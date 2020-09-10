@@ -39,13 +39,11 @@ namespace MapTheVoteAddressBuilder
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
             Console.ForegroundColor = ConsoleColor.White;
 
+            string JSESSIONID = "";
             var tr = new TargetRequest()
             {
                 //To get JESSIONID, log into mapthe.vote/map
                 //Go to cookies in developer menu, get value of JSESSIONID
-                JSESSIONID = "",
-
-                //To Get Coordinates. Go to dev console and get values from "viewBounds" object.
 
                 N = "32.960363",
                 S = "32.954188",
