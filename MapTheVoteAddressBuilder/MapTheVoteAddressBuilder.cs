@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
+using OpenQA.Selenium.Support.UI;
 
 namespace MapTheVoteAddressBuilder
 {
@@ -42,7 +43,7 @@ namespace MapTheVoteAddressBuilder
             {
                 //To get JESSIONID, log into mapthe.vote/map
                 //Go to cookies in developer menu, get value of JSESSIONID
-                JSESSIONID = string.Empty,
+                JSESSIONID = "",
 
                 //To Get Coordinates. Go to dev console and get values from "viewBounds" object.
 
@@ -78,27 +79,66 @@ namespace MapTheVoteAddressBuilder
             var enterMapBtn = _driver.FindElementByClassName("map-msg-button");
             enterMapBtn.Click();
 
-            var taskList = new List<Task>();
+            var numFails = 0;
 
-            var scraper = new AddressScraper();
-            scraper.Initialize(tr.JSESSIONID);
-
-            taskList.Add(scraper.GetTargetAddresses());
-
-            var appSubmitter = new ApplicationSubmitter();
-            taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
-
-            Task.WaitAll(taskList.ToArray());
-
-            Console.WriteLine($"Successfully submitted { appSubmitter.SubmittedAddresses.Count } applications.");
-
-            var addressLines = new List<string>(appSubmitter.SubmittedAddresses.Count);
-            foreach (var processedAddress in appSubmitter.SubmittedAddresses)
+            while (numFails < 5)
             {
-                addressLines.Add($"{processedAddress.Zip5} {processedAddress.Addr}");
-            }
+                WaitForAddressSelection();
 
-            WriteFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", addressLines);
+                var taskList = new List<Task>();
+
+                var scraper = new AddressScraper();
+                scraper.Initialize(tr.JSESSIONID);
+
+                taskList.Add(scraper.GetTargetAddresses(_driver));
+
+                var appSubmitter = new ApplicationSubmitter();
+                taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
+
+                Task.WaitAll(taskList.ToArray());
+
+                var numAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
+                Console.WriteLine($"Successfully submitted { numAddressesSubmitted } applications.");
+
+                var adressesSubmitted = numAddressesSubmitted != 0;
+                numFails = adressesSubmitted ? numFails + 1 : 0 ;
+
+                if (adressesSubmitted)
+                {
+                    appSubmitter.SubmittedAddresses.Sort((lhs, rhs) =>
+                    {
+                        var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
+
+                        if (compareVal == 0)
+                        {
+                            compareVal = lhs.City.CompareTo(rhs.City);
+
+                            if (compareVal == 0)
+                            {
+                                compareVal = lhs.FormattedAddress.CompareTo(rhs.FormattedAddress);
+                            }
+                        }
+
+                        return compareVal;
+                    });
+
+                    var addressLines = new List<string>(appSubmitter.SubmittedAddresses.Count * 2);
+
+                    string pastZip = string.Empty;
+                    foreach (var addy in appSubmitter.SubmittedAddresses)
+                    {
+                        if (pastZip != addy.Zip5)
+                        {
+                            addressLines.Add($"{addy.Zip5}");
+                            pastZip = addy.Zip5;
+                        }
+
+                        addressLines.Add($"\t{addy.FormattedAddress}");
+                    }
+
+                    WriteFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", addressLines);
+                }
+            }
         }
 
         static void LoginToMapTheVote()
@@ -125,6 +165,36 @@ namespace MapTheVoteAddressBuilder
             submitEmailBtn.Click();
         }
 
+        static void WaitForAddressSelection()
+        {
+            var addressFound = false;
+            do
+            {
+                try
+                {
+                    var registerBtn = _driver.FindElementById("map-infowindow");
+                    var btnWait = new WebDriverWait(_driver, TimeSpan.FromSeconds(3));
+                    var elementComplete = btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
+
+                    addressFound = elementComplete != null;
+
+                    if (addressFound)
+                    {
+                        Console.WriteLine("Page load complete. Continuing execution.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (e is NoSuchElementException)
+                    {
+                        Console.WriteLine("Waiting for the page to load. Please select an address.");
+                        Util.RandomWait(3000).Wait();
+                    }
+                }
+            }
+            while (!addressFound);
+        }
+
         static void TestApplicationSent()
         {
             var testResponse = new AddressResponse
@@ -140,6 +210,8 @@ namespace MapTheVoteAddressBuilder
 
         private static void WriteFile(string fileName, IEnumerable<string> lines)
         {
+            Console.WriteLine($"Creating Addresses File @ {fileName}");
+
             using var tw = new StreamWriter(fileName);
 
             foreach (var s in lines)

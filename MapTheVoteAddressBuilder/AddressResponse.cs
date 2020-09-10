@@ -22,8 +22,8 @@ namespace MapTheVoteAddressBuilder
         //    "modified": 1599067019417
         //},
 
-        public float Lng { get; set; }
-        public float Lat { get; set; }
+        public double Lng { get; set; }
+        public double Lat { get; set; }
 
         public int Id { get; set; }
 
@@ -41,7 +41,20 @@ namespace MapTheVoteAddressBuilder
         public string State { get; set; }
 
         public string County { get; set; }
-    }
 
-  
+        public string FormattedAddress
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Addr2))
+                {
+                    return Addr;
+                }
+                else
+                {
+                    return $"{Addr}, {Addr2}";
+                }
+            }
+        }
+    }
 }
