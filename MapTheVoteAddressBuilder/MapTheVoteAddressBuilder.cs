@@ -196,7 +196,7 @@ namespace MapTheVoteAddressBuilder
 
             CombineAddressesFiles();
 
-            Console.WriteLine("Execution complete.");
+            Console.WriteLine("Execution complete. Restart the application to send more registration forms.");
         }
 
         static void ParseCommandLineArguments(string[] aArgs)
