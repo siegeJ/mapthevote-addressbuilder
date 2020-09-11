@@ -18,6 +18,8 @@ namespace MapTheVoteAddressBuilder
 
         static string AddressesFileName { get { return $"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt"; } }
 
+        static ApplicationSubmitter appSubmitter = new ApplicationSubmitter();
+
         static void SetupDriver()
         {
             try
@@ -46,6 +48,9 @@ namespace MapTheVoteAddressBuilder
 
         static void Main(string[] args)
         {
+
+            AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("MapThe.Vote/Map Address Builder");
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
@@ -95,8 +100,7 @@ namespace MapTheVoteAddressBuilder
             ViewBounds prevBounds = null;
             while (numFails < 3)
             {
-                var appSubmitter = new ApplicationSubmitter();
-
+        
                 Task<IEnumerable<AddressResponse>> processAppsTask = null;
 
                 try
@@ -170,23 +174,6 @@ namespace MapTheVoteAddressBuilder
 
                 if (adressesSubmitted)
                 {
-                    // Sort our addresses by Zip, City, and then address.
-                    appSubmitter.SubmittedAddresses.Sort((lhs, rhs) =>
-                    {
-                        var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
-
-                        if (compareVal == 0)
-                        {
-                            compareVal = lhs.City.CompareTo(rhs.City);
-
-                            if (compareVal == 0)
-                            {
-                                compareVal = lhs.FormattedAddress.CompareTo(rhs.FormattedAddress);
-                            }
-                        }
-
-                        return compareVal;
-                    });
 
                     WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
                 }
@@ -233,6 +220,15 @@ namespace MapTheVoteAddressBuilder
             }
         }
 
+        static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            //If we exited early
+            if (!File.Exists(AddressesFileName))
+            {
+                WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
+            }
+        }
+
         // Combines all address files into a single .txt, then renames anything
         // used to {file}.consumed
         private static void CombineAddressesFiles()
@@ -263,9 +259,28 @@ namespace MapTheVoteAddressBuilder
             }
         }
 
-        private static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
+        public static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
         {
-            var numAddresses = aAddresses.Count();
+            var addressList = aAddresses.ToList();
+            // Sort our addresses by Zip, City, and then address.
+            addressList.Sort((lhs, rhs) =>
+            {
+                var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
+
+                if (compareVal == 0)
+                {
+                    compareVal = lhs.City.CompareTo(rhs.City);
+
+                    if (compareVal == 0)
+                    {
+                        compareVal = lhs.FormattedAddress.CompareTo(rhs.FormattedAddress);
+                    }
+                }
+
+                return compareVal;
+            });
+
+            var numAddresses = addressList.Count;
             if (numAddresses == 0)
             {
                 return;
@@ -276,7 +291,7 @@ namespace MapTheVoteAddressBuilder
             using var tw = new StreamWriter(aFileName);
 
             string pastZip = string.Empty;
-            foreach (var addy in aAddresses)
+            foreach (var addy in addressList)
             {
                 // Categorize zips by address
                 if (pastZip != addy.Zip5)
