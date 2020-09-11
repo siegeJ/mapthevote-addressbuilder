@@ -12,6 +12,7 @@ namespace MapTheVoteAddressBuilder
 {
     public enum ErrorPhase
     {
+        DriverInitialization,
         MapTheVoteLogin,
         AddressSelection,
         ApplicationSubmit,

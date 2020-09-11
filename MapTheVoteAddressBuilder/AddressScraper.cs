@@ -7,11 +7,53 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace MapTheVoteAddressBuilder
 {
+    public class ViewBounds
+    {
+        public string N { get; set; } = string.Empty;
+        public string S { get; set; } = string.Empty;
+        public string E { get; set; } = string.Empty;
+        public string W { get; set; } = string.Empty;
+
+        public string Lat { get; set; } = string.Empty;
+        public string Lng { get; set; } = string.Empty;
+
+        public ViewBounds(Dictionary<string, object> queriedBounds)
+        {
+
+            if (queriedBounds != null)
+            {
+                Func<Dictionary<string, object>, string, string> GetBound = (boundsDict, key) =>
+                {
+                    var returnString = string.Empty;
+                    object objValue = null;
+                    if (queriedBounds.TryGetValue(key, out objValue))
+                    {
+                        return objValue.ToString();
+                    }
+
+                    return returnString;
+                };
+
+                N = GetBound(queriedBounds, "n");
+                S = GetBound(queriedBounds, "s");
+                E = GetBound(queriedBounds, "e");
+                W = GetBound(queriedBounds, "w");
+
+                Lat = GetBound(queriedBounds, "lat");
+                Lng = GetBound(queriedBounds, "lng");
+            }
+        }
+
+        public string LatLngString
+        {
+            get { return $"{{lat: {Lat}, lng: {Lng}}}"; }
+        }
+    }
+
     public class AddressScraper
     {
         HttpClientHandler _handler;
@@ -41,53 +83,37 @@ namespace MapTheVoteAddressBuilder
         }
 
         // Gets all available addresses from the current user's view rectangle.
-        public async Task GetTargetAddresses(RemoteWebDriver aDriver)
+        public async Task GetTargetAddresses(RemoteWebDriver aDriver, ViewBounds aViewBounds)
         {
-            // grab the current viewbounds from the user.
-            var curViewBounds = aDriver.ExecuteScript("return viewBounds") as System.Collections.Generic.Dictionary<string, object>;
-
-            // You can provide your own debug coordinates by 
-            // going to the dev console and get values from "viewBounds" object.
-            var tempTarRequest = new TargetRequest()
-            {
-                N = curViewBounds["n"].ToString(),
-                S = curViewBounds["s"].ToString(),
-                E = curViewBounds["e"].ToString(),
-                W = curViewBounds["w"].ToString()
-            };
-
-            var locString = $"{{lat: {curViewBounds["lat"]}, lng: {curViewBounds["lng"]}}}";
-
-            // Force a recenter and refresh to ensure that our cache is correct before we query for this marker info.
-            aDriver.ExecuteScript($"map.setCenter({locString});");
-            aDriver.ExecuteScript($"refreshMapMarkers();");
-
-            // Ensure that we aren't querying a location that someone else has already sent to.
-            // We also don't support multi-family dwellings yet. (Purely becuase I haven't scripted the UX for it yet)
-            _targetResponses = QueryTargetList(tempTarRequest).Where((response) => response.NeedsApplication && response.IsSingleHousehold)
-                                                .ToList();
-
-            double totalTargets = _targetResponses.Count;
-            Console.WriteLine($"Found a total of for {totalTargets} target Ids.");
-
-            // Using its own variable since the blocking collection
-            // can have elements removed from it from another thread.
             var totalResponses = 0;
-            foreach (var response in _targetResponses)
+            if (aViewBounds != null)
             {
-                var addrResponse = await _client.GetAsync($"https://mapthe.vote/rest/addresses/list?targetId={response.Id}");
-                var responseString = await addrResponse.Content.ReadAsStringAsync();
+                // Ensure that we aren't querying a location that someone else has already sent to.
+                // We also don't support multi-family dwellings yet. (Purely becuase I haven't scripted the UX for it yet)
+                _targetResponses = QueryTargetList(aViewBounds).Where((response) => response.NeedsApplication && response.IsSingleHousehold)
+                                                    .ToList();
 
-                var addresses = JsonConvert.DeserializeObject<IEnumerable<AddressResponse>>(responseString);
+                double totalTargets = _targetResponses.Count;
+                Console.WriteLine($"Found a total of for {totalTargets} target Ids.");
 
-                // TODO: Support for multi family dwellings.
-                if (addresses.Count() == 1)
+                // Using its own variable since the blocking collection
+                // can have elements removed from it from another thread.
+                foreach (var response in _targetResponses)
                 {
-                    var addy = addresses.First();
-                    ParsedAddresses.Add(addy);
-                    ++totalResponses;
+                    var addrResponse = await _client.GetAsync($"https://mapthe.vote/rest/addresses/list?targetId={response.Id}");
+                    var responseString = await addrResponse.Content.ReadAsStringAsync();
 
-                    Console.WriteLine($"Queued up submission for Target ID: |{addy.Id}|,  {addy.Addr} @ Lat: {addy.Lat}, Lng: {addy.Lng}");
+                    var addresses = JsonConvert.DeserializeObject<IEnumerable<AddressResponse>>(responseString);
+
+                    // TODO: Support for multi family dwellings.
+                    if (addresses.Count() == 1)
+                    {
+                        var addy = addresses.First();
+                        ParsedAddresses.Add(addy);
+                        ++totalResponses;
+
+                        Console.WriteLine($"Queued up submission for Target ID: |{addy.Id}|,  {addy.Addr} @ Lat: {addy.Lat}, Lng: {addy.Lng}");
+                    }
                 }
             }
 
@@ -95,12 +121,12 @@ namespace MapTheVoteAddressBuilder
             Console.WriteLine($"A total of {totalResponses} marker infos were successfully queried from target IDs.");
         }
 
-        private IEnumerable<TargetResponse> QueryTargetList(TargetRequest aTarget)
+        private IEnumerable<TargetResponse> QueryTargetList(ViewBounds aViewBounds)
         {
-            Console.WriteLine($"Requesting Address Targets. Request: " + JsonConvert.SerializeObject(aTarget));
+            Console.WriteLine("Requesting Address Targets. Request: {0}", aViewBounds.LatLngString);
 
             //I think the max limit is 1000
-            var response = _client.GetAsync($"rest/targets/list?n={aTarget.N}&s={aTarget.S}&e={aTarget.E}&w={aTarget.W}&limit=10000").GetAwaiter().GetResult();
+            var response = _client.GetAsync($"rest/targets/list?n={aViewBounds.N}&s={aViewBounds.S}&e={aViewBounds.E}&w={aViewBounds.W}&limit=1000").GetAwaiter().GetResult();
             var responseString = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             return JsonConvert.DeserializeObject<IEnumerable<TargetResponse>>(responseString);

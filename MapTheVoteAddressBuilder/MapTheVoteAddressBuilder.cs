@@ -18,21 +18,28 @@ namespace MapTheVoteAddressBuilder
 
         static void SetupDriver()
         {
-            var ffOptions = new FirefoxOptions();
-            ffOptions.SetPreference("geo.enabled", false);
-            ffOptions.SetPreference("geo.provider.use_corelocation", false);
-            ffOptions.SetPreference("geo.prompt.testing", false);
-            ffOptions.SetPreference("geo.prompt.testing.allow", false);
-
-            if (Debugger.IsAttached)
+            try
             {
-                ffOptions.SetLoggingPreference(LogType.Browser, LogLevel.All);
+                var ffOptions = new FirefoxOptions();
+                ffOptions.SetPreference("geo.enabled", false);
+                ffOptions.SetPreference("geo.provider.use_corelocation", false);
+                ffOptions.SetPreference("geo.prompt.testing", false);
+                ffOptions.SetPreference("geo.prompt.testing.allow", false);
+
+                if (Debugger.IsAttached)
+                {
+                    ffOptions.SetLoggingPreference(LogType.Browser, LogLevel.All);
+                }
+
+                // Set gekodriver location.
+                _driver = new FirefoxDriver(Directory.GetCurrentDirectory(), ffOptions);
+
+                Util.FixDriverCommandExecutionDelay(_driver);
             }
-
-            // Set gekodriver location.
-            _driver = new FirefoxDriver(Directory.GetCurrentDirectory(), ffOptions);
-
-            Util.FixDriverCommandExecutionDelay(_driver);
+            catch(Exception e)
+            {
+                Util.LogError(ErrorPhase.DriverInitialization, e.ToString());
+            }
         }
 
         static void Main(string[] args)
@@ -63,7 +70,7 @@ namespace MapTheVoteAddressBuilder
             // Need to manually log in if we don't have a valid cookie.
             if (string.IsNullOrEmpty(JSESSIONID))
             {
-                LoginToMapTheVote();
+                MapTheVoteScripter.Login(_driver);
 
                 var jsessionCookie = _driver.Manage().Cookies.GetCookieNamed("JSESSIONID");
                 if (jsessionCookie != null)
@@ -84,14 +91,20 @@ namespace MapTheVoteAddressBuilder
 
                 try
                 {
-                    WaitForAddressSelection();
+                    MapTheVoteScripter.WaitForMarkerSelection(_driver);
 
                     var taskList = new List<Task>();
 
                     var scraper = new AddressScraper();
                     scraper.Initialize(JSESSIONID);
 
-                    taskList.Add(scraper.GetTargetAddresses(_driver));
+                    var curViewBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
+
+                    if (curViewBounds != null)
+                    {
+                        MapTheVoteScripter.CenterOnViewBounds(_driver, curViewBounds);
+                    }
+                    taskList.Add(scraper.GetTargetAddresses(_driver, curViewBounds));
                     
                     taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
 
@@ -162,67 +175,6 @@ namespace MapTheVoteAddressBuilder
                     Util.LogError(ErrorPhase.ParsingArguments, $"Could not parse argument {arg}");
                 }
             }
-        }
-
-        static void LoginToMapTheVote()
-        {
-            // Find the "Login with email" button.
-            try
-            {
-                _driver.ClickOnElement("firebaseui-idp-password", ElementSearchType.ClassName).Wait();
-            }
-            catch (Exception e)
-            {
-                // if it doesn't exist yet, it's likely/possible that the user
-                // has already logged in.
-                if (!(e is NoSuchElementException))
-                {
-                    Util.LogError(ErrorPhase.MapTheVoteLogin, e.ToString());
-                }
-
-                return;
-            }
-
-            // Find the "Enter email address" field
-            var nameField = _driver.FindElementByName("email");
-            nameField.SendKeys("hegayiv804@wonrg.com");
-
-            _driver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
-
-            var passwordField = _driver.WaitForElement("password");
-            passwordField.SendKeys("3*YevRM1i7L9");
-
-            _driver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
-        }
-
-        static void WaitForAddressSelection()
-        {
-            var addressFound = false;
-            do
-            {
-                try
-                {
-                    var registerBtn = _driver.FindElementById("map-infowindow");
-                    var btnWait = new WebDriverWait(_driver, TimeSpan.FromSeconds(3));
-                    var elementComplete = btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
-
-                    addressFound = elementComplete != null;
-
-                    if (addressFound)
-                    {
-                        Console.WriteLine("Page load complete. Continuing execution.");
-                    }
-                }
-                catch (Exception e)
-                {
-                    if (e is NoSuchElementException)
-                    {
-                        Console.WriteLine("Waiting for the page to load. Please select an address.");
-                        Util.RandomWait(3000).Wait();
-                    }
-                }
-            }
-            while (!addressFound);
         }
 
         private static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
