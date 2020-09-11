@@ -83,7 +83,7 @@ namespace MapTheVoteAddressBuilder
         }
 
         // Gets all available addresses from the current user's view rectangle.
-        public async Task GetTargetAddresses(RemoteWebDriver aDriver, ViewBounds aViewBounds)
+        public async Task<int> GetTargetAddresses(RemoteWebDriver aDriver, ViewBounds aViewBounds)
         {
             var totalResponses = 0;
             if (aViewBounds != null)
@@ -119,6 +119,8 @@ namespace MapTheVoteAddressBuilder
 
             ParsedAddresses.CompleteAdding();
             Console.WriteLine($"A total of {totalResponses} marker infos were successfully queried from target IDs.");
+
+            return totalResponses;
         }
 
         private IEnumerable<TargetResponse> QueryTargetList(ViewBounds aViewBounds)

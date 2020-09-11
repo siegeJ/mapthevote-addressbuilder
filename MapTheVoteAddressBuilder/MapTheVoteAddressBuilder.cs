@@ -87,43 +87,57 @@ namespace MapTheVoteAddressBuilder
             DateTime startingTime = default;
 
             var numFails = 0;
-            while (numFails < 5)
+            var lastNumAddressesParsed = 0;
+            ViewBounds prevBounds = null;
+            while (numFails < 2)
             {
                 var appSubmitter = new ApplicationSubmitter();
 
                 try
                 {
-                    MapTheVoteScripter.WaitForMarkerSelection(_driver);
+                    // Wait for user input if we've successfully parsed everything from the
+                    // previous run. Otherwise we can use the same bounds again in order to 
+                    // re-sweep for the markers that we may have missed.
+                    // This can happpen
+                    
+                    if (lastNumAddressesParsed == 0 || (prevBounds == null))
+                    {
+                        MapTheVoteScripter.WaitForMarkerSelection(_driver);
+                        prevBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Repeating the previous search to find uncached values.");
+                    }
 
                     startingTime = DateTime.Now;
-
-                    var taskList = new List<Task>();
 
                     var scraper = new AddressScraper();
                     scraper.Initialize(JSESSIONID);
 
-                    var curViewBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
-
-                    if (curViewBounds != null)
+                    if (prevBounds != null)
                     {
-                        MapTheVoteScripter.CenterOnViewBounds(_driver, curViewBounds);
+                        MapTheVoteScripter.CenterOnViewBounds(_driver, prevBounds);
                     }
-                    taskList.Add(scraper.GetTargetAddresses(_driver, curViewBounds));
-                    
-                    taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
 
-                    Task.WaitAll(taskList.ToArray());
+                    var getAddressesTask = scraper.GetTargetAddresses(_driver, prevBounds);
+                    var processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
+
+                    Task.WaitAll(getAddressesTask, processAppsTask);
+
+                    lastNumAddressesParsed = getAddressesTask.Result;
+
                 }
                 catch (Exception e)
                 {
                     Util.LogError(ErrorPhase.Misc, e.ToString());
                 }
 
-                var numAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
-                Console.WriteLine($"Successfully submitted { numAddressesSubmitted } applications.");
+                var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
+                Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
                 // We wait for 5 consecutive fails before ultimately deciding to call it quits.
-                var adressesSubmitted = numAddressesSubmitted != 0;
+                var adressesSubmitted = lastNumAddressesSubmitted != 0;
                 numFails = adressesSubmitted ? 0 : numFails + 1;
 
                 if (adressesSubmitted)
