@@ -84,6 +84,8 @@ namespace MapTheVoteAddressBuilder
 
             _driver.ClickOnElement("map-msg-button", ElementSearchType.ClassName).Wait();
 
+            DateTime startingTime = default;
+
             var numFails = 0;
             while (numFails < 5)
             {
@@ -92,6 +94,8 @@ namespace MapTheVoteAddressBuilder
                 try
                 {
                     MapTheVoteScripter.WaitForMarkerSelection(_driver);
+
+                    startingTime = DateTime.Now;
 
                     var taskList = new List<Task>();
 
@@ -144,6 +148,8 @@ namespace MapTheVoteAddressBuilder
 
                     WriteAddressesFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", appSubmitter.SubmittedAddresses);
                 }
+
+                Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
             }
         }
 
