@@ -6,13 +6,73 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace MapTheVoteAddressBuilder
 {
     public class ApplicationSubmitter
     {
         public List<AddressResponse> SubmittedAddresses { get; private set; } = new List<AddressResponse>();
+
+        public void ProcessApplicationsManually(RemoteWebDriver aDriver, BlockingCollection<AddressResponse> aResponses)
+        {
+            Console.WriteLine("Set of " + aResponses.Count + " addresses");
+            var taskList = new List<Task>();
+
+            foreach (var address in aResponses.GetConsumingEnumerable())
+            {
+                string streetAddress = address.Addr + " " + address.Addr2;
+                Clipboard.SetText(streetAddress);
+
+                Console.WriteLine("");
+                Console.WriteLine("Clipboard holds Street Address of: {0} {1} {2}", streetAddress, address.City, address.Zip5);
+                Console.WriteLine("Hit Enter for next address. 'Q' to quit.");
+                string input = Console.ReadLine();
+
+                //Wait for registration to be marked. Probably not necessary but helps if someone double taps Enter
+                while(!taskList.TrueForAll(x => x.IsCompleted))
+                {
+                    Console.WriteLine("Previous address not marked as registered. Waiting for it...");
+                    Task.Delay(1000).Wait();
+                }
+
+                taskList.Clear();
+                taskList.Add(MarkAddressAsRegistered(aDriver, address));
+
+                //Quit. Mark last address and break out
+                if(input.Equals("Q"))
+                {
+                    Task.WaitAll(taskList.ToArray());
+                    return;
+                }
+
+                Task.Run(taskList.ToArray);
+            }
+        }
+
+        public async Task<IEnumerable<AddressResponse>> MarkAddressAsRegistered(RemoteWebDriver aDriver, AddressResponse aAddress)
+        {
+            if (await SelectAddress(aDriver, aAddress))
+            {
+                var mapSuccess = await aDriver.ClickOnButton("map-infowindow");
+                if (mapSuccess)
+                {
+                    mapSuccess = await aDriver.ClickOnButton("wizard-button-all-done");
+
+                    var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                    btnWait.Until(ExpectedConditions.ElementToBeClickable(By.ClassName("map-infowindow")));
+
+                    if (mapSuccess)
+                    {
+                        SubmittedAddresses.Add(aAddress);
+                    }
+                }
+            }
+
+            return SubmittedAddresses;
+        }
 
         public async Task<IEnumerable<AddressResponse>> ProcessApplications(RemoteWebDriver aDriver, BlockingCollection<AddressResponse> aResponses)
         {
