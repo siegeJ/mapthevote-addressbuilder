@@ -53,7 +53,7 @@ namespace MapTheVoteAddressBuilder
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("MapThe.Vote/Map Address Builder");
-            Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
+            Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ and Ray Batts https://github.com/RayBatts");
             Console.ForegroundColor = ConsoleColor.White;
 
             Util.PreventSleep();
