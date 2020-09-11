@@ -51,6 +51,8 @@ namespace MapTheVoteAddressBuilder
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
             Console.ForegroundColor = ConsoleColor.White;
 
+            Util.PreventSleep();
+
             ParseCommandLineArguments(args);
 
             SetupDriver();

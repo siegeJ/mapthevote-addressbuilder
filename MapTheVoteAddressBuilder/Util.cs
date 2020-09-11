@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using OpenQA.Selenium.Remote;
 using OpenQA.Selenium.Support.UI;
+using System.Runtime.InteropServices;
 
 #if NETCORE
 using System;
@@ -32,6 +33,28 @@ namespace MapTheVoteAddressBuilder
     public static class Util
     {
         static Random _rng = new Random();
+
+        public static void PreventSleep()
+        {
+            SetThreadExecutionState(ExecutionState.EsContinuous | ExecutionState.EsSystemRequired);
+        }
+
+        public static void AllowSleep()
+        {
+            SetThreadExecutionState(ExecutionState.EsContinuous);
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern ExecutionState SetThreadExecutionState(ExecutionState esFlags);
+
+        [FlagsAttribute]
+        private enum ExecutionState : uint
+        {
+            EsAwaymodeRequired = 0x00000040,
+            EsContinuous = 0x80000000,
+            EsDisplayRequired = 0x00000002,
+            EsSystemRequired = 0x00000001
+        }
 
         public static void LogError(ErrorPhase aWarningType, string aErrorMessage)
         {
