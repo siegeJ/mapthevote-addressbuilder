@@ -12,6 +12,7 @@ namespace MapTheVoteAddressBuilder
     class MapTheVoteAddressBuilder
     {
         static FirefoxDriver _driver;
+        static bool MANUAL_APPLICATION_REQUESTS = true;
 
         static void SetupDriver()
         {
@@ -32,6 +33,7 @@ namespace MapTheVoteAddressBuilder
             Util.FixDriverCommandExecutionDelay(_driver);
         }
 
+        [STAThreadAttribute]
         static void Main(string[] args)
         {
             Console.ForegroundColor = ConsoleColor.Green;
@@ -46,7 +48,7 @@ namespace MapTheVoteAddressBuilder
             // before continuing execution.
             _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
 
-            string JSESSIONID = "";
+            string JSESSIONID = "jvnZ7yJ8ePXH0aH1tP_OLA";
             // TODO: Detect if JSESSION was valid. If not, we'll need to log in.
             if (string.IsNullOrEmpty(JSESSIONID))
             {
@@ -84,10 +86,17 @@ namespace MapTheVoteAddressBuilder
 
                     taskList.Add(scraper.GetTargetAddresses(_driver));
 
-                    
-                    taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
+                    if (!MANUAL_APPLICATION_REQUESTS)
+                    {
+                        taskList.Add(appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses));
+                    }
 
                     Task.WaitAll(taskList.ToArray());
+
+                    if (MANUAL_APPLICATION_REQUESTS)
+                    {
+                        appSubmitter.ProcessApplicationsManually(_driver, scraper.ParsedAddresses);
+                    }
                 }
                 catch (Exception e)
                 {
