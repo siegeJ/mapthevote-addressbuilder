@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using OpenQA.Selenium.Remote;
 using OpenQA.Selenium.Support.UI;
+using System.Runtime.InteropServices;
 
 #if NETCORE
 using System;
@@ -12,16 +13,51 @@ namespace MapTheVoteAddressBuilder
 {
     public enum ErrorPhase
     {
+        DriverInitialization,
+        MapTheVoteLogin,
         AddressSelection,
         ApplicationSubmit,
         ApplicationConfirm,
         ButtonClick,
-        Misc
+        MarkApplicationProcessed,
+        Misc,
+        ParsingArguments
+    }
+
+    public enum ElementSearchType
+    {
+        ID,
+        ClassName
     }
 
     public static class Util
     {
+        // Won't actually mark things as complete or submit applications.
+        public static bool DebugMode { get; set; } = false;
+
         static Random _rng = new Random();
+
+        public static void PreventSleep()
+        {
+            SetThreadExecutionState(ExecutionState.EsContinuous | ExecutionState.EsSystemRequired);
+        }
+
+        public static void AllowSleep()
+        {
+            SetThreadExecutionState(ExecutionState.EsContinuous);
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern ExecutionState SetThreadExecutionState(ExecutionState esFlags);
+
+        [FlagsAttribute]
+        private enum ExecutionState : uint
+        {
+            EsAwaymodeRequired = 0x00000040,
+            EsContinuous = 0x80000000,
+            EsDisplayRequired = 0x00000002,
+            EsSystemRequired = 0x00000001
+        }
 
         public static void LogError(ErrorPhase aWarningType, string aErrorMessage)
         {
@@ -30,17 +66,44 @@ namespace MapTheVoteAddressBuilder
             Console.ForegroundColor = ConsoleColor.White;
         }
 
-        public static async Task<bool> ClickOnButton(this RemoteWebDriver aDriver, string id)
+        public static async Task<bool> ClickOnElement(this RemoteWebDriver aDriver, string id, ElementSearchType searchType = ElementSearchType.ID)
         {
             bool success = false;
             try
             {
-                var registerBtn = aDriver.FindElementById(id);
+                Func<IWebDriver, IWebElement> checkElementExists = null;
+                
+                switch(searchType)
+                {
+                    case ElementSearchType.ID:
+                    {
+                        checkElementExists = ExpectedConditions.ElementExists(By.Id(id));
+                        break;
+                    }
 
+                    case ElementSearchType.ClassName:
+                    {
+                        checkElementExists = ExpectedConditions.ElementExists(By.ClassName(id));
+                        break;
+                    }
+
+                    default:
+                    {
+                        break;
+                    }
+                }
+
+                // Ensure first that the element exists on screen.
                 var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
-                registerBtn.Click();
+                var elementToClick = btnWait.Until(checkElementExists);
 
+                // Now ensure that it's clickable.
+                var clickWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                clickWait.Until(ExpectedConditions.ElementToBeClickable(elementToClick));
+                elementToClick.Click();
+
+                // This is a final "catch all" wait in case someone after us doesn't properly wait (like a script).
+                // TBH it's probably unnecessary, but can be removed in the future.
                 await Util.RandomWait(250, 400);
 
                 success = true;
