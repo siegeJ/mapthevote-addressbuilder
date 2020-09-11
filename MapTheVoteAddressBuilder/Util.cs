@@ -18,7 +18,8 @@ namespace MapTheVoteAddressBuilder
         ApplicationConfirm,
         ButtonClick,
         MarkApplicationProcessed,
-        Misc
+        Misc,
+        ParsingArguments
     }
 
     public enum ElementSearchType

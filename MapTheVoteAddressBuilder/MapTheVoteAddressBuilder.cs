@@ -2,8 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq.Expressions;
-using System.Runtime.InteropServices;
+using System.Linq;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
@@ -14,6 +13,8 @@ namespace MapTheVoteAddressBuilder
     class MapTheVoteAddressBuilder
     {
         static FirefoxDriver _driver;
+
+        static string JSESSIONID = string.Empty;
 
         static void SetupDriver()
         {
@@ -41,9 +42,10 @@ namespace MapTheVoteAddressBuilder
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
             Console.ForegroundColor = ConsoleColor.White;
 
+            ParseCommandLineArguments(args);
+
             SetupDriver();
 
-            string JSESSIONID = "";
             if (!string.IsNullOrEmpty(JSESSIONID))
             {
                 // Can't set a cookie for a domain that we're not yet on.
@@ -109,6 +111,7 @@ namespace MapTheVoteAddressBuilder
 
                 if (adressesSubmitted)
                 {
+                    // Sort our addresses by Zip, City, and then address.
                     appSubmitter.SubmittedAddresses.Sort((lhs, rhs) =>
                     {
                         var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
@@ -126,21 +129,37 @@ namespace MapTheVoteAddressBuilder
                         return compareVal;
                     });
 
-                    var addressLines = new List<string>(appSubmitter.SubmittedAddresses.Count * 2);
+                    WriteAddressesFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", appSubmitter.SubmittedAddresses);
+                }
+            }
+        }
 
-                    string pastZip = string.Empty;
-                    foreach (var addy in appSubmitter.SubmittedAddresses)
+        static void ParseCommandLineArguments(string[] aArgs)
+        {
+            foreach (var arg in aArgs)
+            {
+                var argumentParsed = false;
+                if (arg.Contains("JSESSIONID", StringComparison.OrdinalIgnoreCase))
+                {
+                    var splitArgs = arg.Split(' ');
+
+                    if (splitArgs.Length == 2)
                     {
-                        if (pastZip != addy.Zip5)
-                        {
-                            addressLines.Add($"{addy.Zip5}");
-                            pastZip = addy.Zip5;
-                        }
-
-                        addressLines.Add($"\t{addy.FormattedAddress}");
+                        argumentParsed = true;
+                        JSESSIONID = splitArgs[1];
                     }
+                    else
+                    {
+                        if (!argumentParsed)
+                        {
+                            Util.LogError(ErrorPhase.ParsingArguments, $"Could not parse argument {arg}");
+                        }
+                    }
+                }
 
-                    WriteFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", addressLines);
+                if (!argumentParsed)
+                {
+                    Util.LogError(ErrorPhase.ParsingArguments, $"Could not parse argument {arg}");
                 }
             }
         }
@@ -148,7 +167,6 @@ namespace MapTheVoteAddressBuilder
         static void LoginToMapTheVote()
         {
             // Find the "Login with email" button.
-
             try
             {
                 _driver.ClickOnElement("firebaseui-idp-password", ElementSearchType.ClassName).Wait();
@@ -207,28 +225,29 @@ namespace MapTheVoteAddressBuilder
             while (!addressFound);
         }
 
-        static void TestApplicationSent()
+        private static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
         {
-            var testResponse = new AddressResponse
+            var numAddresses = aAddresses.Count();
+            if (numAddresses == 0)
             {
-                Addr = "12345 HappytownLn",
-                Addr2 = "APT 125",
-                City = "Sunshine City",
-                Zip5 = "12345"
-            };
+                return;
+            }
 
-            ApplicationSubmitter.SubmitNewApplication(_driver, testResponse, true).Wait();
-        }
+            Console.WriteLine($"Creating Addresses File @ {aFileName}");
 
-        private static void WriteFile(string fileName, IEnumerable<string> lines)
-        {
-            Console.WriteLine($"Creating Addresses File @ {fileName}");
+            using var tw = new StreamWriter(aFileName);
 
-            using var tw = new StreamWriter(fileName);
-
-            foreach (var s in lines)
+            string pastZip = string.Empty;
+            foreach (var addy in aAddresses)
             {
-                tw.WriteLine(s);
+                // Categorize zips by address
+                if (pastZip != addy.Zip5)
+                {
+                    tw.WriteLine($"{addy.Zip5}");
+                    pastZip = addy.Zip5;
+                }
+
+                tw.WriteLine($"\t{addy.FormattedAddress}");
             }
         }
     }
