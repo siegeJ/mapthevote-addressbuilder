@@ -1,10 +1,8 @@
-﻿using OpenQA.Selenium;
-using OpenQA.Selenium.Remote;
+﻿using OpenQA.Selenium.Remote;
 using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -99,8 +97,11 @@ namespace MapTheVoteAddressBuilder
 
             await Util.RandomWait(750, 650);
 
-            submitBtn.Click();
-            await Util.RandomWait(300, 200);
+            if (!Util.DebugMode)
+            {
+                submitBtn.Click();
+                await Util.RandomWait(300, 200);
+            }
 
             aDriver.Close();
 

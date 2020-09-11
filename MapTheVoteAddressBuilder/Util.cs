@@ -32,6 +32,9 @@ namespace MapTheVoteAddressBuilder
 
     public static class Util
     {
+        // Won't actually mark things as complete or submit applications.
+        public static bool DebugMode { get; set; } = false;
+
         static Random _rng = new Random();
 
         public static void PreventSleep()

@@ -64,9 +64,9 @@ namespace MapTheVoteAddressBuilder
                     {
                         Console.WriteLine("Waiting for the page to load. Please select a map marker.");
                         Util.RandomWait(3000).Wait();
-
-                        tryCounter++;
                     }
+
+                    tryCounter++;
                 }
             }
             while (tryCounter < 10);
@@ -165,12 +165,27 @@ namespace MapTheVoteAddressBuilder
                 if (applicationProcessed)
                 {
                     // Click on the "Everyone Registered!" button
-                    applicationProcessed = await aDriver.ClickOnElement("wizard-button-all-done");
 
-                    // It takes a while for this operation to complete. Wait until the window has closed,
-                    // and the new "Registered" window re-opens before returning back to the caller.
-                    var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                    btnWait.Until(ExpectedConditions.ElementToBeClickable(By.ClassName("map-infowindow")));
+                    if (Util.DebugMode)
+                    {
+                        // Ensure first that the element exists on screen.
+                        var dbgWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                        var elementToClick = dbgWait.Until(ExpectedConditions.ElementExists(By.Id("wizard-button-all-done")));   
+
+                        if (elementToClick != null)
+                        {
+                            elementToClick.SendKeys(Keys.Escape);
+                        }
+                    }
+                    else
+                    {
+                        applicationProcessed = await aDriver.ClickOnElement("wizard-button-all-done");
+
+                        // It takes a while for this operation to complete. Wait until the window has closed,
+                        // and the new "Registered" window re-opens before returning back to the caller.
+                        var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
+                        btnWait.Until(ExpectedConditions.ElementToBeClickable(By.ClassName("map-infowindow")));
+                    }
                 }
             }
             catch (Exception e)

@@ -221,6 +221,10 @@ namespace MapTheVoteAddressBuilder
                         }
                     }
                 }
+                else if (arg.Contains("DEBUG", StringComparison.OrdinalIgnoreCase))
+                {
+                    Util.DebugMode = true;
+                }
 
                 if (!argumentParsed)
                 {
@@ -233,9 +237,13 @@ namespace MapTheVoteAddressBuilder
         // used to {file}.consumed
         private static void CombineAddressesFiles()
         {
-            Console.WriteLine("Combining all addresses files.");
-
             var filesToCombine = Directory.GetFiles(Directory.GetCurrentDirectory(), "Addresses_*.txt");
+            if (filesToCombine.Length == 0)
+            {
+                return;
+            }
+
+            Console.WriteLine("Combining all addresses files.");
 
             using var tw = new StreamWriter($"COMBINED_{AddressesFileName}");
 
