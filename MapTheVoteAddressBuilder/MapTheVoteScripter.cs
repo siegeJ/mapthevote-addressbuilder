@@ -41,9 +41,9 @@ namespace MapTheVoteAddressBuilder
             aDriver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
         }
 
-        public static void WaitForMarkerSelection(RemoteWebDriver aDriver)
+        public static bool WaitForMarkerSelection(RemoteWebDriver aDriver)
         {
-            var addressFound = false;
+            var tryCounter = 0;
             do
             {
                 try
@@ -52,23 +52,26 @@ namespace MapTheVoteAddressBuilder
                     var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(3));
                     var elementComplete = btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
 
-                    addressFound = elementComplete != null;
-
-                    if (addressFound)
+                    if (elementComplete != null)
                     {
                         Console.WriteLine("Page load complete. Continuing execution.");
+                        break;
                     }
                 }
                 catch (Exception e)
                 {
                     if (e is NoSuchElementException)
                     {
-                        Console.WriteLine("Waiting for the page to load. Please select an address.");
+                        Console.WriteLine("Waiting for the page to load. Please select a map marker.");
                         Util.RandomWait(3000).Wait();
+
+                        tryCounter++;
                     }
                 }
             }
-            while (!addressFound);
+            while (tryCounter < 10);
+
+            return tryCounter < 10;
         }
 
         public static ViewBounds GetCurrentViewBounds(RemoteWebDriver aDriver)
@@ -81,7 +84,6 @@ namespace MapTheVoteAddressBuilder
             if (objDict != null)
             {
                 returnVal = new ViewBounds(objDict);
-
             }
 
             return returnVal;
@@ -99,6 +101,16 @@ namespace MapTheVoteAddressBuilder
                 aDriver.ExecuteScript($"map.setCenter({aBounds.LatLngString});");
                 aDriver.ExecuteScript($"refreshMapMarkers();");
             }
+        }
+
+        public static void DecrementZoom(RemoteWebDriver aDriver, ViewBounds aViewBounds)
+        {
+            aViewBounds.Zoom = Math.Clamp(aViewBounds.Zoom - 1, 10, 21);
+            aDriver.ExecuteScript($"map.setZoom(arguments[0]);", aViewBounds.Zoom);
+
+            // Another shitty hack, but we need to wait for the map to zoom out and recache markers, 
+            // and this is a lot easier than tryign to hook into the JS event.
+            Util.RandomWait(1500).Wait();
         }
 
         // MapTheVote holds onto their data in two different places. They internally have a database of

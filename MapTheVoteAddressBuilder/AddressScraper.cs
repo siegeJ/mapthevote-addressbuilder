@@ -21,6 +21,11 @@ namespace MapTheVoteAddressBuilder
         public string Lat { get; set; } = string.Empty;
         public string Lng { get; set; } = string.Empty;
 
+        public int Zoom { get; set; }
+
+        // While the min is technically 10, there's really no reason to go higher than 13
+        public static readonly Tuple<int, int> ZOOM_LIMITS = new Tuple<int, int>(13, 21);
+
         public ViewBounds(Dictionary<string, object> queriedBounds)
         {
 
@@ -45,6 +50,12 @@ namespace MapTheVoteAddressBuilder
 
                 Lat = GetBound(queriedBounds, "lat");
                 Lng = GetBound(queriedBounds, "lng");
+
+                int zoomVal = 0;
+                if (int.TryParse(GetBound(queriedBounds, "zoom"), out zoomVal))
+                {
+                    Zoom = zoomVal;
+                }
             }
         }
 

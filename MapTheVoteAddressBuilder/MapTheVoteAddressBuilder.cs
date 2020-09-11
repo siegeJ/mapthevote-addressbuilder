@@ -16,6 +16,8 @@ namespace MapTheVoteAddressBuilder
 
         static string JSESSIONID = string.Empty;
 
+        static string AddressesFileName { get { return $"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt"; } }
+
         static void SetupDriver()
         {
             try
@@ -89,9 +91,11 @@ namespace MapTheVoteAddressBuilder
             var numFails = 0;
             var lastNumAddressesParsed = 0;
             ViewBounds prevBounds = null;
-            while (numFails < 2)
+            while (numFails < 3)
             {
                 var appSubmitter = new ApplicationSubmitter();
+
+                Task<IEnumerable<AddressResponse>> processAppsTask = null;
 
                 try
                 {
@@ -99,10 +103,25 @@ namespace MapTheVoteAddressBuilder
                     // previous run. Otherwise we can use the same bounds again in order to 
                     // re-sweep for the markers that we may have missed.
                     // This can happpen
-                    
-                    if (lastNumAddressesParsed == 0 || (prevBounds == null))
+                    var noAddressesParsed = lastNumAddressesParsed == 0;
+                    if (noAddressesParsed || (prevBounds == null))
                     {
-                        MapTheVoteScripter.WaitForMarkerSelection(_driver);
+                        if (noAddressesParsed && prevBounds != null && (prevBounds.Zoom > ViewBounds.ZOOM_LIMITS.Item1))
+                        {
+                            MapTheVoteScripter.DecrementZoom(_driver, prevBounds);
+                            // Reset fail count if we're going to try searching around.
+                            numFails = 0;
+                        }
+                        else
+                        {
+                            // End execution if the user has idled out
+                            var success = MapTheVoteScripter.WaitForMarkerSelection(_driver);
+                            if (!success)
+                            {
+                                break;
+                            }
+                        }
+
                         prevBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
                     }
                     else
@@ -121,7 +140,7 @@ namespace MapTheVoteAddressBuilder
                     }
 
                     var getAddressesTask = scraper.GetTargetAddresses(_driver, prevBounds);
-                    var processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
+                    processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
 
                     Task.WaitAll(getAddressesTask, processAppsTask);
 
@@ -133,10 +152,17 @@ namespace MapTheVoteAddressBuilder
                     Util.LogError(ErrorPhase.Misc, e.ToString());
                 }
 
+                // Do this in case the user did something to fuck things up. This way we can still successfully write out the file.
+                // TODO: Thread the filewriting.
+                if (processAppsTask != null && processAppsTask.Status == TaskStatus.Running)
+                {
+                    processAppsTask.Wait();
+                }
+
                 var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
                 Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
-                // We wait for 5 consecutive fails before ultimately deciding to call it quits.
+                // We wait for 3 consecutive fails before ultimately deciding to call it quits.
                 var adressesSubmitted = lastNumAddressesSubmitted != 0;
                 numFails = adressesSubmitted ? 0 : numFails + 1;
 
@@ -160,11 +186,15 @@ namespace MapTheVoteAddressBuilder
                         return compareVal;
                     });
 
-                    WriteAddressesFile($"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt", appSubmitter.SubmittedAddresses);
+                    WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
                 }
 
                 Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
             }
+
+            CombineAddressesFiles();
+
+            Console.WriteLine("Execution complete.");
         }
 
         static void ParseCommandLineArguments(string[] aArgs)
@@ -194,6 +224,32 @@ namespace MapTheVoteAddressBuilder
                 {
                     Util.LogError(ErrorPhase.ParsingArguments, $"Could not parse argument {arg}");
                 }
+            }
+        }
+
+        // Combines all address files into a single .txt, then renames anything
+        // used to {file}.consumed
+        private static void CombineAddressesFiles()
+        {
+            Console.WriteLine("Combining all addresses files.");
+
+            var filesToCombine = Directory.GetFiles(Directory.GetCurrentDirectory(), "Addresses_*.txt");
+
+            using var tw = new StreamWriter($"COMBINED_{AddressesFileName}");
+
+            foreach(var file in filesToCombine)
+            {
+                var existingLines = File.ReadAllLines(file);
+
+                foreach(var line in existingLines)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        tw.WriteLine(line);
+                    }   
+                }
+
+                File.Move(file, Path.ChangeExtension(file, ".consumed"));
             }
         }
 
