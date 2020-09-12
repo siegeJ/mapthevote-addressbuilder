@@ -165,9 +165,10 @@ namespace MapTheVoteAddressBuilder
 
                 var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
 
+                var addressesSubmitted = lastNumAddressesSubmitted != 0;
                 // We wait for 3 consecutive fails before ultimately deciding to call it quits.
-                numFails = adressesSubmitted ? 0 : numFails + 1;
-                if (adressesSubmitted)
+                numFails = addressesSubmitted ? 0 : numFails + 1;
+                if (addressesSubmitted)
                 {
                     var adressesSubmitted = lastNumAddressesSubmitted != 0;
                     Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
