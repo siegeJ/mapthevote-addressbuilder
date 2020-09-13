@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Mail;
+using System.Net.Mime;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
@@ -19,6 +22,15 @@ namespace MapTheVoteAddressBuilder
         static string AddressesFileName { get { return $"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt"; } }
 
         static ApplicationSubmitter appSubmitter = new ApplicationSubmitter();
+
+        #region AutomatedEmail
+        //Information for automatically sending an email at the end.
+        //You can use your own email to send it, but will need to "Allow less secure apps" in gmail. https://myaccount.google.com/security.
+        private static string sendingGmailEmail = "mapthevoteaddressbuilder@gmail.com";
+        private static string sendingGmailPassword = "Hit up Ray or CJ for the password :), or put your own email/password";
+        private static string ToEmail = "Most likely ray's email";
+        #endregion
+
 
         static void SetupDriver()
         {
@@ -226,6 +238,7 @@ namespace MapTheVoteAddressBuilder
             if (!File.Exists(AddressesFileName))
             {
                 WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
+                CombineAddressesFiles();
             }
         }
 
@@ -241,7 +254,8 @@ namespace MapTheVoteAddressBuilder
 
             Console.WriteLine("Combining all addresses files.");
 
-            using var tw = new StreamWriter($"COMBINED_{AddressesFileName}");
+            string combinedFileName = $"COMBINED_{AddressesFileName}";
+            using var tw = new StreamWriter(combinedFileName);
 
             foreach(var file in filesToCombine)
             {
@@ -256,6 +270,42 @@ namespace MapTheVoteAddressBuilder
                 }
 
                 File.Move(file, Path.ChangeExtension(file, ".consumed"));
+            }
+
+            tw.Dispose();
+            SendEmail(combinedFileName);
+        }
+
+        private static void SendEmail(string fileName)
+        {
+            try
+            {
+                var smtpClient = new SmtpClient("smtp.gmail.com")
+                {
+                    Port = 587,
+                    Credentials = new NetworkCredential(sendingGmailEmail, sendingGmailPassword),
+                    EnableSsl = true,
+                };
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress("mapthevoteaddressbuilder@gmail.com", "MapTheVoteAddressBuilder"),
+                    Subject = "Addresses",
+                    Body =
+                        "This is an automated message from the MapTheVoteAddressBuilder application. https://github.com/siegeJ/mapthevote-addressbuilder",
+                    IsBodyHtml = true,
+                };
+
+                mailMessage.To.Add(ToEmail);
+                var attachment = new Attachment(fileName, MediaTypeNames.Text.Plain);
+                mailMessage.Attachments.Add(attachment);
+
+                smtpClient.Send(mailMessage);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("You probably need to fill out the AutomatedEmail section above.");
+                Console.WriteLine(e.ToString());
             }
         }
 
