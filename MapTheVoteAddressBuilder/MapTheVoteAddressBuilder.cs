@@ -110,10 +110,13 @@ namespace MapTheVoteAddressBuilder
             var numFails = 0;
             var lastNumAddressesParsed = 0;
             ViewBounds prevBounds = null;
+
+            var appSubmitter = new ApplicationSubmitter();
+
             while (numFails < 3)
             {
-        
                 Task<IEnumerable<AddressResponse>> processAppsTask = null;
+                appSubmitter.SubmittedAddresses.Clear();
 
                 try
                 {
@@ -178,14 +181,14 @@ namespace MapTheVoteAddressBuilder
                 }
 
                 var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
-                Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
+                var addressesSubmitted = lastNumAddressesSubmitted != 0;
                 // We wait for 3 consecutive fails before ultimately deciding to call it quits.
-                var adressesSubmitted = lastNumAddressesSubmitted != 0;
-                numFails = adressesSubmitted ? 0 : numFails + 1;
-
-                if (adressesSubmitted)
+                numFails = addressesSubmitted ? 0 : numFails + 1;
+                if (addressesSubmitted)
                 {
+                    var adressesSubmitted = lastNumAddressesSubmitted != 0;
+                    Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
                     WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
                 }
@@ -195,7 +198,7 @@ namespace MapTheVoteAddressBuilder
 
             CombineAddressesFiles();
 
-            Console.WriteLine("Execution complete.");
+            Console.WriteLine("Execution complete. Restart the application to send more registration forms.");
         }
 
         static void ParseCommandLineArguments(string[] aArgs)
@@ -266,7 +269,7 @@ namespace MapTheVoteAddressBuilder
                     if (!string.IsNullOrWhiteSpace(line))
                     {
                         tw.WriteLine(line);
-                    }   
+                    }
                 }
 
                 File.Move(file, Path.ChangeExtension(file, ".consumed"));
