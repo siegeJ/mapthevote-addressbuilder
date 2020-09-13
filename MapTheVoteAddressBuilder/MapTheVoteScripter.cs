@@ -35,43 +35,50 @@ namespace MapTheVoteAddressBuilder
 
             aDriver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
 
-            var passwordField = aDriver.WaitForElement("password");
+            var passwordField = aDriver.WaitForElement("password", ElementSearchType.Name);
             passwordField.SendKeys("3*YevRM1i7L9");
 
             aDriver.ClickOnElement("firebaseui-id-submit", ElementSearchType.ClassName).Wait();
         }
 
-        public static bool WaitForMarkerSelection(RemoteWebDriver aDriver)
+        public static bool WaitForMarkerSelection(RemoteWebDriver aDriver, bool aInfiniteWait = false)
         {
-            var tryCounter = 0;
+            Console.WriteLine("Please select a map marker in MapTheVote.");
+
+            bool success = false;
+            var retryCounter = 0;
             do
             {
                 try
                 {
-                    var registerBtn = aDriver.FindElementById("map-infowindow");
-                    var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(3));
-                    var elementComplete = btnWait.Until(ExpectedConditions.ElementToBeClickable(registerBtn));
+                    // Wait for the window that opens once selecting a map marker.
+                    var mapMarkerWindow = aDriver.WaitForElement("map-infowindow", ElementSearchType.ID);
 
-                    if (elementComplete != null)
+                    if (mapMarkerWindow != null)
                     {
-                        Console.WriteLine("Page load complete. Continuing execution.");
-                        break;
+                        var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(8));
+                        var elementComplete = btnWait.Until(ExpectedConditions.ElementToBeClickable(mapMarkerWindow));
+
+                        success = elementComplete != null;
                     }
                 }
                 catch (Exception e)
                 {
-                    if (e is NoSuchElementException)
+                    // We expect these two exceptions a lot while waiting on user input.
+                    if (((e is NoSuchElementException) || (e is WebDriverTimeoutException)))
                     {
-                        Console.WriteLine("Waiting for the page to load. Please select a map marker.");
-                        Util.RandomWait(3000).Wait();
+                        Util.LogError(ErrorPhase.AddressSelection, e.ToString());
                     }
-
-                    tryCounter++;
                 }
             }
-            while (tryCounter < 10);
+            while (retryCounter++ < 10 || !aInfiniteWait);
 
-            return tryCounter < 10;
+            if (success)
+            {
+                Console.WriteLine("Starting marker selected. Continuing execution.");
+            }
+
+            return success;
         }
 
         public static ViewBounds GetCurrentViewBounds(RemoteWebDriver aDriver)
