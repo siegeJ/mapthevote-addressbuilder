@@ -85,10 +85,10 @@ namespace MapTheVoteAddressBuilder
             await Util.RandomWait(100, 650);
 
             // Go for our submit button.
-            var submitBtn = aDriver.FindElementByName("submit");
+            var submitBtn = aDriver.WaitForElement("submit", ElementSearchType.Name);
             submitBtn.Click();
 
-            submitBtn = aDriver.WaitForElement("submit");
+            submitBtn = aDriver.WaitForElement("submit", ElementSearchType.Name);
             if (submitBtn == null)
             {
                 Util.LogError(ErrorPhase.ApplicationSubmit, "Could not load Confirmation page");

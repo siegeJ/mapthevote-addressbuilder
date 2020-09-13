@@ -27,7 +27,8 @@ namespace MapTheVoteAddressBuilder
     public enum ElementSearchType
     {
         ID,
-        ClassName
+        ClassName,
+        Name
     }
 
     public static class Util
@@ -59,6 +60,21 @@ namespace MapTheVoteAddressBuilder
             EsSystemRequired = 0x00000001
         }
 
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos( IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, int uFlags);
+
+        private const int HWND_TOPMOST = -1;
+        private const int SWP_NOMOVE = 0x0002;
+        private const int SWP_NOSIZE = 0x0001;
+
+        public static void SetAlwaysOnTop()
+        {
+            IntPtr hWnd = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+
+            SetWindowPos(hWnd, new IntPtr(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        }
+
         public static void LogError(ErrorPhase aWarningType, string aErrorMessage)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -71,9 +87,39 @@ namespace MapTheVoteAddressBuilder
             bool success = false;
             try
             {
+                // Ensure first that the element exists on screen.
+                var elementToClick = aDriver.WaitForElement(id, searchType);
+
+                if (elementToClick != null)
+                {
+                    // Now ensure that it's clickable.
+                    var clickWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(2));
+                    clickWait.Until(ExpectedConditions.ElementToBeClickable(elementToClick));
+                    elementToClick.Click();
+
+                    // This is a final "catch all" wait in case someone after us doesn't properly wait (like a script).
+                    // TBH it's probably unnecessary, but can be removed in the future.
+                    await Util.RandomWait(250, 400);
+
+                    success = true;
+                }
+            }
+            catch (Exception e)
+            {
+                Util.LogError(ErrorPhase.ButtonClick, e.ToString());
+            }
+
+            return success;
+        }
+
+        public static IWebElement WaitForElement(this RemoteWebDriver aDriver, string id, ElementSearchType searchType = ElementSearchType.ID)
+        {
+            IWebElement foundElement = null;
+            try
+            {
                 Func<IWebDriver, IWebElement> checkElementExists = null;
-                
-                switch(searchType)
+
+                switch (searchType)
                 {
                     case ElementSearchType.ID:
                     {
@@ -87,39 +133,28 @@ namespace MapTheVoteAddressBuilder
                         break;
                     }
 
+                    case ElementSearchType.Name:
+                    {
+                        checkElementExists = ExpectedConditions.ElementExists(By.Name(id));
+                        break;
+                    }
+
                     default:
                     {
-                        break;
+                        throw new NotSupportedException("Invalid ElementSearch type.");
                     }
                 }
 
                 // Ensure first that the element exists on screen.
                 var btnWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                var elementToClick = btnWait.Until(checkElementExists);
-
-                // Now ensure that it's clickable.
-                var clickWait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(10));
-                clickWait.Until(ExpectedConditions.ElementToBeClickable(elementToClick));
-                elementToClick.Click();
-
-                // This is a final "catch all" wait in case someone after us doesn't properly wait (like a script).
-                // TBH it's probably unnecessary, but can be removed in the future.
-                await Util.RandomWait(250, 400);
-
-                success = true;
+                foundElement = btnWait.Until(checkElementExists);
             }
-            catch (Exception e)
+            catch (Exception) // We're cool bubbling this up to the calling function.
             {
-                Util.LogError(ErrorPhase.ButtonClick, e.ToString());
+
             }
 
-            return success;
-        }
-
-        public static IWebElement WaitForElement(this RemoteWebDriver aDriver, string elementName, double aTimeout = 3.0)
-        {
-            var _wait = new WebDriverWait(aDriver, TimeSpan.FromSeconds(aTimeout));
-            return _wait.Until(d => d.FindElement(By.Name(elementName)));
+            return foundElement;
         }
 
         public static async Task RandomWait(uint aBaseMs, uint aVarianceMs = 0u)
