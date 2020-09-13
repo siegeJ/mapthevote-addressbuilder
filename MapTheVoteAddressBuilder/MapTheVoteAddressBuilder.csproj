@@ -8,6 +8,7 @@
     <RepositoryUrl>https://github.com/siegeJ/mapthevote-addressbuilder</RepositoryUrl>
     <PackageId>MapTheVoteAddressBuilder</PackageId>
     <AssemblyName>MapTheVoteAddressBuilder</AssemblyName>
+    <ApplicationIcon>VoteIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
