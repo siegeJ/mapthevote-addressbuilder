@@ -23,12 +23,14 @@
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="Selenium.Support" Version="3.141.0" />
     <PackageReference Include="Selenium.WebDriver" Version="3.141.0" />
-    <PackageReference Include="Selenium.WebDriver.GeckoDriver" Version="0.27.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="SelectMapMarker.js">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <None Update="dependencies\gekodriver\win32\geckodriver.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="dependencies\gekodriver\win64\geckodriver.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

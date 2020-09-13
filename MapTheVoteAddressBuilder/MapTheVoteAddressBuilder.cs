@@ -9,7 +9,6 @@ using System.Net.Mime;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
-using OpenQA.Selenium.Support.UI;
 
 namespace MapTheVoteAddressBuilder
 {
@@ -27,10 +26,11 @@ namespace MapTheVoteAddressBuilder
         //Information for automatically sending an email at the end.
         //You can use your own email to send it, but will need to "Allow less secure apps" in gmail. https://myaccount.google.com/security.
         private static string sendingGmailEmail = "mapthevoteaddressbuilder@gmail.com";
-        private static string sendingGmailPassword = "Hit up Ray or CJ for the password :), or put your own email/password";
-        private static string ToEmail = "Most likely ray's email";
-        #endregion
+        private static string sendingGmailPassword = ""; // Hit up Ray or CJ for the password :), or put your own email/password
+        private static string ToEmail = ""; // Most likely ray's email
 
+        private static bool SendAddressesInEmail = false;
+        #endregion
 
         static void SetupDriver()
         {
@@ -48,7 +48,8 @@ namespace MapTheVoteAddressBuilder
                 }
 
                 // Set gekodriver location.
-                _driver = new FirefoxDriver(Directory.GetCurrentDirectory(), ffOptions);
+                string architecture = System.Environment.Is64BitOperatingSystem ? "win64" : "win32";
+                _driver = new FirefoxDriver($"{Directory.GetCurrentDirectory()}/dependencies/gekodriver/{architecture}", ffOptions);
 
                 Util.FixDriverCommandExecutionDelay(_driver);
             }
@@ -60,15 +61,13 @@ namespace MapTheVoteAddressBuilder
 
         static void Main(string[] args)
         {
-
             AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
+            Util.SetAlwaysOnTop();
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("MapThe.Vote/Map Address Builder");
             Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ and Ray Batts https://github.com/RayBatts");
             Console.ForegroundColor = ConsoleColor.White;
-
-            Util.PreventSleep();
 
             ParseCommandLineArguments(args);
 
@@ -105,100 +104,107 @@ namespace MapTheVoteAddressBuilder
 
             _driver.ClickOnElement("map-msg-button", ElementSearchType.ClassName).Wait();
 
-            DateTime startingTime = default;
-
-            var numFails = 0;
-            var lastNumAddressesParsed = 0;
-            ViewBounds prevBounds = null;
-
-            var appSubmitter = new ApplicationSubmitter();
-
-            while (numFails < 3)
+            bool userRequestedExit = false;
+            do
             {
-                Task<IEnumerable<AddressResponse>> processAppsTask = null;
-                appSubmitter.SubmittedAddresses.Clear();
+                DateTime startingTime = default;
+                var numFails = 0;
+                var lastNumAddressesParsed = 0;
+                ViewBounds prevBounds = null;
 
-                try
+                while (numFails < 5)
                 {
-                    // Wait for user input if we've successfully parsed everything from the
-                    // previous run. Otherwise we can use the same bounds again in order to 
-                    // re-sweep for the markers that we may have missed.
-                    // This can happpen
-                    var noAddressesParsed = lastNumAddressesParsed == 0;
-                    if (noAddressesParsed || (prevBounds == null))
+                    Task<IEnumerable<AddressResponse>> processAppsTask = null;
+                    appSubmitter.SubmittedAddresses.Clear();
+
+                    try
                     {
-                        if (noAddressesParsed && prevBounds != null && (prevBounds.Zoom > ViewBounds.ZOOM_LIMITS.Item1))
+                        // Wait for user input if we've successfully parsed everything from the
+                        // previous run. Otherwise we can use the same bounds again in order to 
+                        // re-sweep for the markers that we may have missed.
+                        // This can happpen
+                        var noAddressesParsed = lastNumAddressesParsed == 0;
+                        if (noAddressesParsed || (prevBounds == null))
                         {
-                            MapTheVoteScripter.DecrementZoom(_driver, prevBounds);
-                            // Reset fail count if we're going to try searching around.
-                            numFails = 0;
+                            if (noAddressesParsed && prevBounds != null && (prevBounds.Zoom > ViewBounds.ZOOM_LIMITS.Item1))
+                            {
+                                MapTheVoteScripter.DecrementZoom(_driver, prevBounds);
+                                // Reset fail count if we're going to try searching around.
+                                numFails = 0;
+                            }
+                            else
+                            {
+                                var firstLoopExecution = prevBounds == null;
+                                var success = MapTheVoteScripter.WaitForMarkerSelection(_driver, firstLoopExecution);
+                                if (!success)
+                                {
+                                    break;
+                                }
+                            }
+
+                            prevBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
                         }
                         else
                         {
-                            // End execution if the user has idled out
-                            var success = MapTheVoteScripter.WaitForMarkerSelection(_driver);
-                            if (!success)
-                            {
-                                break;
-                            }
+                            Console.WriteLine("Repeating the previous search to find uncached values.");
                         }
 
-                        prevBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
+                        Console.WriteLine("Starting search. You are free to minimize the browswe and console windows while I process unregistered voters and send them applications.");
+
+                        startingTime = DateTime.Now;
+
+                        var scraper = new AddressScraper();
+                        scraper.Initialize(JSESSIONID);
+
+                        if (prevBounds != null)
+                        {
+                            MapTheVoteScripter.CenterOnViewBounds(_driver, prevBounds);
+                        }
+
+                        var getAddressesTask = scraper.GetTargetAddresses(_driver, prevBounds);
+                        processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
+
+                        Task.WaitAll(getAddressesTask, processAppsTask);
+
+                        lastNumAddressesParsed = getAddressesTask.Result;
+
                     }
-                    else
+                    catch (Exception e)
                     {
-                        Console.WriteLine("Repeating the previous search to find uncached values.");
+                        Util.LogError(ErrorPhase.Misc, e.ToString());
                     }
 
-                    startingTime = DateTime.Now;
-
-                    var scraper = new AddressScraper();
-                    scraper.Initialize(JSESSIONID);
-
-                    if (prevBounds != null)
+                    // Do this in case the user did something to fuck things up. This way we can still successfully write out the file.
+                    // TODO: Thread the filewriting.
+                    if (processAppsTask != null && processAppsTask.Status == TaskStatus.Running)
                     {
-                        MapTheVoteScripter.CenterOnViewBounds(_driver, prevBounds);
+                        processAppsTask.Wait();
                     }
 
-                    var getAddressesTask = scraper.GetTargetAddresses(_driver, prevBounds);
-                    processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
+                    var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
 
-                    Task.WaitAll(getAddressesTask, processAppsTask);
+                    var addressesSubmitted = lastNumAddressesSubmitted != 0;
+                    // We wait for 3 consecutive fails before ultimately deciding to call it quits.
+                    numFails = addressesSubmitted ? 0 : numFails + 1;
+                    if (addressesSubmitted)
+                    {
+                        var adressesSubmitted = lastNumAddressesSubmitted != 0;
+                        Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
-                    lastNumAddressesParsed = getAddressesTask.Result;
+                        WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
+                    }
 
-                }
-                catch (Exception e)
-                {
-                    Util.LogError(ErrorPhase.Misc, e.ToString());
-                }
-
-                // Do this in case the user did something to fuck things up. This way we can still successfully write out the file.
-                // TODO: Thread the filewriting.
-                if (processAppsTask != null && processAppsTask.Status == TaskStatus.Running)
-                {
-                    processAppsTask.Wait();
+                    Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
                 }
 
-                var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
+                CombineAddressesFiles();
 
-                var addressesSubmitted = lastNumAddressesSubmitted != 0;
-                // We wait for 3 consecutive fails before ultimately deciding to call it quits.
-                numFails = addressesSubmitted ? 0 : numFails + 1;
-                if (addressesSubmitted)
-                {
-                    var adressesSubmitted = lastNumAddressesSubmitted != 0;
-                    Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
+                Console.WriteLine("Execution complete. Would you like to restart? Press Y to restart or any other key to exit.");
+                var readKey = Console.ReadKey(true);
 
-                    WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
-                }
-
-                Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
+                userRequestedExit = !string.Equals(readKey.KeyChar.ToString(), "y", StringComparison.InvariantCultureIgnoreCase);
             }
-
-            CombineAddressesFiles();
-
-            Console.WriteLine("Execution complete. Restart the application to send more registration forms.");
+            while (!userRequestedExit);
         }
 
         static void ParseCommandLineArguments(string[] aArgs)
@@ -243,6 +249,8 @@ namespace MapTheVoteAddressBuilder
                 WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
                 CombineAddressesFiles();
             }
+
+            Console.WriteLine("Exiting application. Please remember to send any COMBINED_.txt files to the registration drive organizers.");
         }
 
         // Combines all address files into a single .txt, then renames anything
@@ -276,11 +284,27 @@ namespace MapTheVoteAddressBuilder
             }
 
             tw.Dispose();
-            SendEmail(combinedFileName);
+
+            // Temporarily disabling this this until we have the UX to use this without 
+            // require a recompile.
+            if (SendAddressesInEmail)
+            {
+                SendEmail(combinedFileName);
+            }
+            else
+            {
+                Console.WriteLine($"Please send the following file to the drive organizers: ${ combinedFileName }");
+            }
         }
 
         private static void SendEmail(string fileName)
         {
+            if (string.IsNullOrEmpty(ToEmail) || string.IsNullOrEmpty(sendingGmailEmail))
+            {
+                Console.WriteLine("Could not log into email to send address file.");
+                return;
+            }
+
             try
             {
                 var smtpClient = new SmtpClient("smtp.gmail.com")
