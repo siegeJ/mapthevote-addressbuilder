@@ -155,7 +155,7 @@ namespace MapTheVoteAddressBuilder
             }
             else
             {
-                Util.LogError(ErrorPhase.AddressSelection, $"Error selecting {aResponse.FormattedAddress}");
+                Util.LogError(ErrorPhase.AddressSelection, $"Couldn't find the following address in the cache: {aResponse.FormattedAddress}");
             }
 
             return scrapedMarkers;

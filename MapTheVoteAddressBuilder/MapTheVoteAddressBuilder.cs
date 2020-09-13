@@ -9,7 +9,6 @@ using System.Net.Mime;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
-using OpenQA.Selenium.Support.UI;
 
 namespace MapTheVoteAddressBuilder
 {
@@ -27,8 +26,8 @@ namespace MapTheVoteAddressBuilder
         //Information for automatically sending an email at the end.
         //You can use your own email to send it, but will need to "Allow less secure apps" in gmail. https://myaccount.google.com/security.
         private static string sendingGmailEmail = "mapthevoteaddressbuilder@gmail.com";
-        private static string sendingGmailPassword = "Hit up Ray or CJ for the password :), or put your own email/password";
-        private static string ToEmail = "Most likely ray's email";
+        private static string sendingGmailPassword = ""; // Hit up Ray or CJ for the password :), or put your own email/password
+        private static string ToEmail = ""; // Most likely ray's email
 
         private static bool SendAddressesInEmail = false;
         #endregion
@@ -291,10 +290,20 @@ namespace MapTheVoteAddressBuilder
             {
                 SendEmail(combinedFileName);
             }
+            else
+            {
+                Console.WriteLine($"Please send the following file to the drive organizers: ${ combinedFileName }");
+            }
         }
 
         private static void SendEmail(string fileName)
         {
+            if (string.IsNullOrEmpty(ToEmail) || string.IsNullOrEmpty(sendingGmailEmail))
+            {
+                Console.WriteLine("Could not log into email to send address file.");
+                return;
+            }
+
             try
             {
                 var smtpClient = new SmtpClient("smtp.gmail.com")
