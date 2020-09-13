@@ -149,6 +149,8 @@ namespace MapTheVoteAddressBuilder
                             Console.WriteLine("Repeating the previous search to find uncached values.");
                         }
 
+                        Console.WriteLine("Starting search. You are free to minimize the browswe and console windows while I process unregistered voters and send them applications.");
+
                         startingTime = DateTime.Now;
 
                         var scraper = new AddressScraper();
