@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Mail;
+using System.Net.Mime;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Firefox;
@@ -17,6 +20,17 @@ namespace MapTheVoteAddressBuilder
         static string JSESSIONID = string.Empty;
 
         static string AddressesFileName { get { return $"Addresses_{DateTime.Now:yy-MM-dd_HH-mm-ss}.txt"; } }
+
+        static ApplicationSubmitter appSubmitter = new ApplicationSubmitter();
+
+        #region AutomatedEmail
+        //Information for automatically sending an email at the end.
+        //You can use your own email to send it, but will need to "Allow less secure apps" in gmail. https://myaccount.google.com/security.
+        private static string sendingGmailEmail = "mapthevoteaddressbuilder@gmail.com";
+        private static string sendingGmailPassword = "Hit up Ray or CJ for the password :), or put your own email/password";
+        private static string ToEmail = "Most likely ray's email";
+        #endregion
+
 
         static void SetupDriver()
         {
@@ -46,9 +60,12 @@ namespace MapTheVoteAddressBuilder
 
         static void Main(string[] args)
         {
+
+            AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("MapThe.Vote/Map Address Builder");
-            Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ");
+            Console.WriteLine("By: CJ Stankovich https://github.com/siegeJ and Ray Batts https://github.com/RayBatts");
             Console.ForegroundColor = ConsoleColor.White;
 
             Util.PreventSleep();
@@ -173,24 +190,6 @@ namespace MapTheVoteAddressBuilder
                     var adressesSubmitted = lastNumAddressesSubmitted != 0;
                     Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
-                    // Sort our addresses by Zip, City, and then address.
-                    appSubmitter.SubmittedAddresses.Sort((lhs, rhs) =>
-                    {
-                        var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
-
-                        if (compareVal == 0)
-                        {
-                            compareVal = lhs.City.CompareTo(rhs.City);
-
-                            if (compareVal == 0)
-                            {
-                                compareVal = lhs.FormattedAddress.CompareTo(rhs.FormattedAddress);
-                            }
-                        }
-
-                        return compareVal;
-                    });
-
                     WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
                 }
 
@@ -236,6 +235,16 @@ namespace MapTheVoteAddressBuilder
             }
         }
 
+        static void CurrentDomain_ProcessExit(object sender, EventArgs e)
+        {
+            //If we exited early
+            if (!File.Exists(AddressesFileName))
+            {
+                WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
+                CombineAddressesFiles();
+            }
+        }
+
         // Combines all address files into a single .txt, then renames anything
         // used to {file}.consumed
         private static void CombineAddressesFiles()
@@ -248,7 +257,8 @@ namespace MapTheVoteAddressBuilder
 
             Console.WriteLine("Combining all addresses files.");
 
-            using var tw = new StreamWriter($"COMBINED_{AddressesFileName}");
+            string combinedFileName = $"COMBINED_{AddressesFileName}";
+            using var tw = new StreamWriter(combinedFileName);
 
             foreach(var file in filesToCombine)
             {
@@ -264,11 +274,66 @@ namespace MapTheVoteAddressBuilder
 
                 File.Move(file, Path.ChangeExtension(file, ".consumed"));
             }
+
+            tw.Dispose();
+            SendEmail(combinedFileName);
         }
 
-        private static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
+        private static void SendEmail(string fileName)
         {
-            var numAddresses = aAddresses.Count();
+            try
+            {
+                var smtpClient = new SmtpClient("smtp.gmail.com")
+                {
+                    Port = 587,
+                    Credentials = new NetworkCredential(sendingGmailEmail, sendingGmailPassword),
+                    EnableSsl = true,
+                };
+
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(sendingGmailEmail, "MapTheVoteAddressBuilder"),
+                    Subject = "Addresses",
+                    Body =
+                        "This is an automated message from the MapTheVoteAddressBuilder application. https://github.com/siegeJ/mapthevote-addressbuilder",
+                    IsBodyHtml = true,
+                };
+
+                mailMessage.To.Add(ToEmail);
+                var attachment = new Attachment(fileName, MediaTypeNames.Text.Plain);
+                mailMessage.Attachments.Add(attachment);
+
+                smtpClient.Send(mailMessage);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("You probably need to fill out the AutomatedEmail section above.");
+                Console.WriteLine(e.ToString());
+            }
+        }
+
+        public static void WriteAddressesFile(string aFileName, IEnumerable<AddressResponse> aAddresses)
+        {
+            var addressList = aAddresses.ToList();
+            // Sort our addresses by Zip, City, and then address.
+            addressList.Sort((lhs, rhs) =>
+            {
+                var compareVal = lhs.Zip5.CompareTo(rhs.Zip5);
+
+                if (compareVal == 0)
+                {
+                    compareVal = lhs.City.CompareTo(rhs.City);
+
+                    if (compareVal == 0)
+                    {
+                        compareVal = lhs.FormattedAddress.CompareTo(rhs.FormattedAddress);
+                    }
+                }
+
+                return compareVal;
+            });
+
+            var numAddresses = addressList.Count;
             if (numAddresses == 0)
             {
                 return;
@@ -279,7 +344,7 @@ namespace MapTheVoteAddressBuilder
             using var tw = new StreamWriter(aFileName);
 
             string pastZip = string.Empty;
-            foreach (var addy in aAddresses)
+            foreach (var addy in addressList)
             {
                 // Categorize zips by address
                 if (pastZip != addy.Zip5)
