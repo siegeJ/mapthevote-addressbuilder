@@ -289,7 +289,7 @@ namespace MapTheVoteAddressBuilder
 
                 var mailMessage = new MailMessage
                 {
-                    From = new MailAddress("mapthevoteaddressbuilder@gmail.com", "MapTheVoteAddressBuilder"),
+                    From = new MailAddress(sendingGmailEmail, "MapTheVoteAddressBuilder"),
                     Subject = "Addresses",
                     Body =
                         "This is an automated message from the MapTheVoteAddressBuilder application. https://github.com/siegeJ/mapthevote-addressbuilder",
