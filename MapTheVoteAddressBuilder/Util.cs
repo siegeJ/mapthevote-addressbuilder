@@ -64,15 +64,16 @@ namespace MapTheVoteAddressBuilder
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetWindowPos( IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, int uFlags);
 
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
         private const int HWND_TOPMOST = -1;
         private const int SWP_NOMOVE = 0x0002;
         private const int SWP_NOSIZE = 0x0001;
 
         public static void SetAlwaysOnTop()
         {
-            IntPtr hWnd = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
-
-            SetWindowPos(hWnd, new IntPtr(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            SetWindowPos(GetConsoleWindow(), new IntPtr(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
         }
 
         public static void LogError(ErrorPhase aWarningType, string aErrorMessage)
