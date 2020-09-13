@@ -15,19 +15,13 @@
     {
         "Entry"
         {
-        "MsmKey" = "8:_775F199F0E724DBF96BF5625F893205B"
+        "MsmKey" = "8:_60C31045F249411BB3D50A2B98BB4148"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
-        "MsmKey" = "8:_A7C6D1200025452BA48507EEC86C9E80"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_F9A57D38A8FE401DBBAA41B352DD874E"
+        "MsmKey" = "8:_848C3B73FA03402F94797037F933B82F"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -39,7 +33,7 @@
         "DisplayName" = "8:Debug"
         "IsDebugOnly" = "11:TRUE"
         "IsReleaseOnly" = "11:FALSE"
-        "OutputFilename" = "8:Debug\\MapTheVoteInstaller.msi"
+        "OutputFilename" = "8:Debug\\VoterRegistrationProject2020.msi"
         "PackageFilesAs" = "3:2"
         "PackageFileSize" = "3:-2147483648"
         "CabType" = "3:1"
@@ -133,9 +127,9 @@
         }
         "File"
         {
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F9A57D38A8FE401DBBAA41B352DD874E"
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_60C31045F249411BB3D50A2B98BB4148"
             {
-            "SourcePath" = "8:..\\MapTheVoteAddressBuilder\\bin\\Debug\\netcoreapp3.1\\geckodriver.exe"
+            "SourcePath" = "8:C:\\Users\\Ray\\.nuget\\packages\\selenium.webdriver.geckodriver\\0.27.0\\driver\\win64\\geckodriver.exe"
             "TargetName" = "8:geckodriver.exe"
             "Tag" = "8:"
             "Folder" = "8:_08A05F6AA43C4529930EE4666BF95EC9"
@@ -161,11 +155,11 @@
         {
             "{3C67513D-01DD-4637-8A68-80971EB9504F}:_08A05F6AA43C4529930EE4666BF95EC9"
             {
-            "DefaultLocation" = "8:[ProgramFilesFolder][Manufacturer]\\[ProductName]"
+            "DefaultLocation" = "8:[DesktopFolder]\\[ProductName]"
             "Name" = "8:#1925"
             "AlwaysCreate" = "11:FALSE"
             "Condition" = "8:"
-            "Transitive" = "11:FALSE"
+            "Transitive" = "11:TRUE"
             "Property" = "8:TARGETDIR"
                 "Folders"
                 {
@@ -178,17 +172,6 @@
             "Condition" = "8:"
             "Transitive" = "11:FALSE"
             "Property" = "8:DesktopFolder"
-                "Folders"
-                {
-                }
-            }
-            "{1525181F-901A-416C-8A58-119130FE478E}:_A49A453885DF4C02B0BEDA1330E80692"
-            {
-            "Name" = "8:#1919"
-            "AlwaysCreate" = "11:FALSE"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Property" = "8:ProgramMenuFolder"
                 "Folders"
                 {
                 }
@@ -210,7 +193,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:MapTheVoteInstaller"
         "ProductCode" = "8:{5CC1887C-D599-4BE3-ACB7-A645B51E4155}"
-        "PackageCode" = "8:{02B7D1CE-1AD9-4D5C-860E-D0035703B664}"
+        "PackageCode" = "8:{6FB90C4D-E76E-4D3D-AC79-D30DECC5ADA6}"
         "UpgradeCode" = "8:{D51594D4-E0DB-4983-82BF-057C934DC7E3}"
         "AspNetVersion" = "8:2.0.50727.0"
         "RestartWWWService" = "11:FALSE"
@@ -729,7 +712,7 @@
         }
         "ProjectOutput"
         {
-            "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_775F199F0E724DBF96BF5625F893205B"
+            "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_848C3B73FA03402F94797037F933B82F"
             {
             "SourcePath" = "8:..\\MapTheVoteAddressBuilder\\obj\\Debug\\netcoreapp3.1\\MapTheVoteAddressBuilder.exe"
             "TargetName" = "8:"
@@ -751,34 +734,6 @@
             "ProjectOutputGroupRegister" = "3:1"
             "OutputConfiguration" = "8:"
             "OutputGroupCanonicalName" = "8:PublishItems"
-            "OutputProjectGuid" = "8:{6A3B9329-0333-45CC-A778-C836D08C3789}"
-            "ShowKeyOutput" = "11:TRUE"
-                "ExcludeFilters"
-                {
-                }
-            }
-            "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_A7C6D1200025452BA48507EEC86C9E80"
-            {
-            "SourcePath" = "8:..\\MapTheVoteAddressBuilder\\obj\\Debug\\netcoreapp3.1\\MapTheVoteAddressBuilder.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_08A05F6AA43C4529930EE4666BF95EC9"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            "ProjectOutputGroupRegister" = "3:1"
-            "OutputConfiguration" = "8:"
-            "OutputGroupCanonicalName" = "8:Built"
             "OutputProjectGuid" = "8:{6A3B9329-0333-45CC-A778-C836D08C3789}"
             "ShowKeyOutput" = "11:TRUE"
                 "ExcludeFilters"
