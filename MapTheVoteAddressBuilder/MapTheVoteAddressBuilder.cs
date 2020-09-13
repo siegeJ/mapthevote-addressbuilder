@@ -328,6 +328,10 @@ namespace MapTheVoteAddressBuilder
                 mailMessage.Attachments.Add(attachment);
 
                 smtpClient.Send(mailMessage);
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"Successfully submitted {fileName} to project organizers. Thank you!");
+                Console.ForegroundColor = ConsoleColor.White;
             }
             catch (Exception e)
             {
