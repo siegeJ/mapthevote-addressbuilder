@@ -32,8 +32,9 @@ namespace MapTheVoteAddressBuilder
         private static bool SendAddressesInEmail = false;
         #endregion
 
-        static void SetupDriver()
+        static bool SetupDriver(bool aPromptForBinaryLocation = false)
         {
+            var success = false;
             try
             {
                 var ffOptions = new FirefoxOptions();
@@ -41,6 +42,14 @@ namespace MapTheVoteAddressBuilder
                 ffOptions.SetPreference("geo.provider.use_corelocation", false);
                 ffOptions.SetPreference("geo.prompt.testing", false);
                 ffOptions.SetPreference("geo.prompt.testing.allow", false);
+
+                // I've heard of some situations where firefox.exe couldn't be found by gekodriver.
+                // Just in case, we'll give the user a chance to provide this location on their own.
+                if (aPromptForBinaryLocation)
+                {
+                    Console.WriteLine("Could not find Firefox. Please enter the filepath to your firefox.exe: ");
+                    ffOptions.BrowserExecutableLocation = Console.ReadLine();
+                }
 
                 if (Debugger.IsAttached)
                 {
@@ -52,11 +61,15 @@ namespace MapTheVoteAddressBuilder
                 _driver = new FirefoxDriver($"{Directory.GetCurrentDirectory()}/dependencies/gekodriver/{architecture}", ffOptions);
 
                 Util.FixDriverCommandExecutionDelay(_driver);
+
+                success = true;
             }
             catch(Exception e)
             {
                 Util.LogError(ErrorPhase.DriverInitialization, e.ToString());
             }
+
+            return success;
         }
 
         static void Main(string[] args)
@@ -71,7 +84,18 @@ namespace MapTheVoteAddressBuilder
 
             ParseCommandLineArguments(args);
 
-            SetupDriver();
+            var driverSetupSuccess = SetupDriver();
+
+            if (!driverSetupSuccess)
+            {
+                driverSetupSuccess = SetupDriver(true);
+
+                if (!driverSetupSuccess)
+                {
+                    Util.LogError(ErrorPhase.DriverInitialization, "Fatal error. Coult not recover.");
+                    return;
+                }
+            }
 
             if (!string.IsNullOrEmpty(JSESSIONID))
             {

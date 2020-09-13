@@ -19,4 +19,7 @@ Instructions:
 	- On exiting, you should see a handful of COMBINED_Addresses__________.txt files. These are the addresses where applications were sent to.
 	- Feel free to delete any COMBINED_Addresses.txt and/or Addresses______.combined files once you've submitted the .txt file, or once the program has told you that they've been submitted.
 	
+Notes:
+	- Check on this program every 30-60 minutes. While in beta, there are some bugs that may require you to reselect a marker or restart the application.
+	
 Please let us know if you run into any issues.
