@@ -48,7 +48,8 @@ namespace MapTheVoteAddressBuilder
                 }
 
                 // Set gekodriver location.
-                _driver = new FirefoxDriver(Directory.GetCurrentDirectory(), ffOptions);
+                string architecture = System.Environment.Is64BitOperatingSystem ? "win64" : "win32";
+                _driver = new FirefoxDriver($"{Directory.GetCurrentDirectory()}/dependencies/gekodriver/{architecture}", ffOptions);
 
                 Util.FixDriverCommandExecutionDelay(_driver);
             }
