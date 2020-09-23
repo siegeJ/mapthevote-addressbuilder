@@ -97,138 +97,56 @@ namespace MapTheVoteAddressBuilder
                 }
             }
 
-            if (!string.IsNullOrEmpty(JSESSIONID))
-            {
-                // Can't set a cookie for a domain that we're not yet on.
-                // Go to something that we know will 404 so that we can set cookies
-                // before continuing execution.
-                _driver.Navigate().GoToUrl(@"https://mapthe.vote/404page");
+            DateTime startingTime = default;
+            var lastNumAddressesParsed = 0;
 
-                // TODO: Attempt to get cookie from browser.
-                _driver.Manage().Cookies.AddCookie(new OpenQA.Selenium.Cookie("JSESSIONID", JSESSIONID, "mapthe.vote", "/", null));
+            Task<IEnumerable<AddressResponse>> processAppsTask = null;
+            appSubmitter.SubmittedAddresses.Clear();
+
+            try
+            {
+                startingTime = DateTime.Now;
+
+                var scraper = new CSVAddressParser();
+
+                var getAddressesTask = scraper.GetTargetAddresses("TX_vr_postcard_chase.csv");
+
+                processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
+
+                Task.WaitAll(getAddressesTask, processAppsTask);
+
+                lastNumAddressesParsed = getAddressesTask.Result;
+
+            }
+            catch (Exception e)
+            {
+                Util.LogError(ErrorPhase.Misc, e.ToString());
             }
 
-            // With our JSESSION initialized, we can move onto the actual map.
-            _driver.Navigate().GoToUrl(@"https://mapthe.vote/map");
-
-            // Need to manually log in if we don't have a valid cookie.
-            if (string.IsNullOrEmpty(JSESSIONID))
+            // Do this in case the user did something to fuck things up. This way we can still successfully write out the file.
+            // TODO: Thread the filewriting.
+            if (processAppsTask != null && processAppsTask.Status == TaskStatus.Running)
             {
-                MapTheVoteScripter.Login(_driver);
-
-                var jsessionCookie = _driver.Manage().Cookies.GetCookieNamed("JSESSIONID");
-                if (jsessionCookie != null)
-                {
-                    JSESSIONID = jsessionCookie.Value;
-                }
+                processAppsTask.Wait();
             }
 
-            // I hate this, but for some reason waiting for map-msg-button just doesn't work.
-            Util.RandomWait(1000).Wait();
+            var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
 
-            _driver.ClickOnElement("map-msg-button", ElementSearchType.ClassName).Wait();
-
-            bool userRequestedExit = false;
-            do
+            var addressesSubmitted = lastNumAddressesSubmitted != 0;
+            if (addressesSubmitted)
             {
-                DateTime startingTime = default;
-                var numFails = 0;
-                var lastNumAddressesParsed = 0;
-                ViewBounds prevBounds = null;
+                var adressesSubmitted = lastNumAddressesSubmitted != 0;
+                Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
 
-                while (numFails < 5)
-                {
-                    Task<IEnumerable<AddressResponse>> processAppsTask = null;
-                    appSubmitter.SubmittedAddresses.Clear();
-
-                    try
-                    {
-                        // Wait for user input if we've successfully parsed everything from the
-                        // previous run. Otherwise we can use the same bounds again in order to 
-                        // re-sweep for the markers that we may have missed.
-                        // This can happpen
-                        var noAddressesParsed = lastNumAddressesParsed == 0;
-                        if (noAddressesParsed || (prevBounds == null))
-                        {
-                            if (noAddressesParsed && prevBounds != null && (prevBounds.Zoom > ViewBounds.ZOOM_LIMITS.Item1))
-                            {
-                                MapTheVoteScripter.DecrementZoom(_driver, prevBounds);
-                                // Reset fail count if we're going to try searching around.
-                                numFails = 0;
-                            }
-                            else
-                            {
-                                var firstLoopExecution = prevBounds == null;
-                                var success = MapTheVoteScripter.WaitForMarkerSelection(_driver, firstLoopExecution);
-                                if (!success)
-                                {
-                                    break;
-                                }
-                            }
-
-                            prevBounds = MapTheVoteScripter.GetCurrentViewBounds(_driver);
-                        }
-                        else
-                        {
-                            Console.WriteLine("Repeating the previous search to find uncached values.");
-                        }
-
-                        Console.WriteLine("Starting search. You are free to minimize the browswe and console windows while I process unregistered voters and send them applications.");
-
-                        startingTime = DateTime.Now;
-
-                        var scraper = new AddressScraper();
-                        scraper.Initialize(JSESSIONID);
-
-                        if (prevBounds != null)
-                        {
-                            MapTheVoteScripter.CenterOnViewBounds(_driver, prevBounds);
-                        }
-
-                        var getAddressesTask = scraper.GetTargetAddresses(_driver, prevBounds);
-                        processAppsTask = appSubmitter.ProcessApplications(_driver, scraper.ParsedAddresses);
-
-                        Task.WaitAll(getAddressesTask, processAppsTask);
-
-                        lastNumAddressesParsed = getAddressesTask.Result;
-
-                    }
-                    catch (Exception e)
-                    {
-                        Util.LogError(ErrorPhase.Misc, e.ToString());
-                    }
-
-                    // Do this in case the user did something to fuck things up. This way we can still successfully write out the file.
-                    // TODO: Thread the filewriting.
-                    if (processAppsTask != null && processAppsTask.Status == TaskStatus.Running)
-                    {
-                        processAppsTask.Wait();
-                    }
-
-                    var lastNumAddressesSubmitted = appSubmitter.SubmittedAddresses.Count;
-
-                    var addressesSubmitted = lastNumAddressesSubmitted != 0;
-                    // We wait for 3 consecutive fails before ultimately deciding to call it quits.
-                    numFails = addressesSubmitted ? 0 : numFails + 1;
-                    if (addressesSubmitted)
-                    {
-                        var adressesSubmitted = lastNumAddressesSubmitted != 0;
-                        Console.WriteLine($"Successfully submitted { lastNumAddressesSubmitted } / { lastNumAddressesParsed } applications.");
-
-                        WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
-                    }
-
-                    Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
-                }
-
-                CombineAddressesFiles();
-
-                Console.WriteLine("Execution complete. Would you like to restart? Press Y to restart or any other key to exit.");
-                var readKey = Console.ReadKey(true);
-
-                userRequestedExit = !string.Equals(readKey.KeyChar.ToString(), "y", StringComparison.InvariantCultureIgnoreCase);
+                WriteAddressesFile(AddressesFileName, appSubmitter.SubmittedAddresses);
             }
-            while (!userRequestedExit);
+
+            Console.WriteLine("Completed in {0}", DateTime.Now - startingTime);
+
+            CombineAddressesFiles();
+
+            Console.WriteLine("Execution complete. Would you like to restart? Press Y to restart or any other key to exit.");
+            Console.ReadKey(true);
         }
 
         static void ParseCommandLineArguments(string[] aArgs)
@@ -255,6 +173,9 @@ namespace MapTheVoteAddressBuilder
                 }
                 else if (arg.Contains("DEBUG", StringComparison.OrdinalIgnoreCase))
                 {
+                    argumentParsed = true;
+
+                    Console.WriteLine("EXECUTING IN DEBUG MODE. NO PERMANANT CHANGES WILL BE MADE!");
                     Util.DebugMode = true;
                 }
 

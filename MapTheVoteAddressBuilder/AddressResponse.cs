@@ -42,6 +42,9 @@ namespace MapTheVoteAddressBuilder
 
         public string County { get; set; }
 
+        public string FirstName { get; set; } = "Current";
+        public string LastName { get; set; } = "Resident";
+
         public string FormattedAddress
         {
             get
