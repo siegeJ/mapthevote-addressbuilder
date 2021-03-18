@@ -1,5 +1,5 @@
 # mapthevote-addressbuilder
-Scrapes addresses from https://mapthe.vote/map
+Scrapes addresses from https://mapthe.vote/map and then registers them to vote.
 
 You will need to input your session id and map coordinates.
 
